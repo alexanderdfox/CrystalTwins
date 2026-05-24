@@ -228,6 +228,169 @@
 
 	.paused .title-screen { display: none; }
 	.paused .pause-overlay.visible { display: flex; }
+
+	.touch-controls {
+		display: none;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 12px;
+		padding: 0 4px;
+		user-select: none;
+		-webkit-user-select: none;
+		touch-action: manipulation;
+	}
+
+	.touch-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		max-width: 360px;
+		margin: 0 auto;
+	}
+
+	.touch-dpad {
+		display: grid;
+		grid-template-columns: 52px 52px 52px;
+		grid-template-rows: 52px 52px;
+		gap: 6px;
+	}
+
+	.touch-dpad .touch-up {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	.touch-dpad .touch-left { grid-column: 1; grid-row: 2; }
+	.touch-dpad .touch-down { grid-column: 2; grid-row: 2; }
+	.touch-dpad .touch-right { grid-column: 3; grid-row: 2; }
+
+	.touch-actions {
+		display: grid;
+		grid-template-columns: 56px 56px;
+		grid-template-rows: 52px 52px 52px;
+		gap: 6px;
+	}
+
+	.touch-actions .touch-drop {
+		grid-column: 1 / -1;
+	}
+
+	.touch-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 52px;
+		min-height: 52px;
+		padding: 0;
+		border: 2px solid #5a7090;
+		border-radius: 10px;
+		background: linear-gradient(165deg, #2a3548 0%, #1a2230 100%);
+		color: #d8e8f8;
+		font-family: 'Exo 2', system-ui, sans-serif;
+		font-size: 18px;
+		font-weight: 600;
+		cursor: pointer;
+		touch-action: none;
+		-webkit-tap-highlight-color: transparent;
+		box-shadow: 0 2px 0 #0a0e14, inset 0 1px 0 rgba(255, 255, 255, 0.08);
+	}
+
+	.touch-btn.touch-menu {
+		font-size: 11px;
+		letter-spacing: 0.5px;
+	}
+
+	.touch-btn.touch-drop {
+		font-size: 14px;
+		letter-spacing: 1px;
+		background: linear-gradient(165deg, #3a2848 0%, #221830 100%);
+		border-color: #8060a0;
+	}
+
+	.touch-btn.pressed,
+	.touch-btn:active {
+		transform: translateY(2px);
+		box-shadow: 0 0 0 #0a0e14, inset 0 2px 6px rgba(0, 0, 0, 0.45);
+		background: linear-gradient(165deg, #1e2838 0%, #121820 100%);
+	}
+
+	.touch-title-actions {
+		display: none;
+		flex-direction: column;
+		gap: 10px;
+		width: 100%;
+		max-width: 200px;
+		margin-top: 16px;
+	}
+
+	.touch-title-actions .touch-btn {
+		width: 100%;
+		min-height: 44px;
+		font-size: 12px;
+		letter-spacing: 2px;
+	}
+
+	@media (hover: none) and (pointer: coarse) {
+		.touch-controls { display: flex; }
+		.touch-title-actions { display: flex; }
+		.title-screen .blink { display: none; }
+	}
+
+	html.has-touch .touch-controls { display: flex; }
+	html.has-touch .touch-title-actions { display: flex; }
+	html.has-touch .title-screen .blink { display: none; }
+	html.has-touch body {
+		overscroll-behavior: none;
+		touch-action: manipulation;
+	}
+
+	@media (max-width: 720px) {
+		body {
+			align-items: flex-start;
+			padding: 8px 0 24px;
+		}
+
+		.shell {
+			padding: 10px;
+			max-width: min(100vw - 8px, 420px);
+		}
+
+		.game-container {
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.stats {
+			width: 100%;
+			max-width: 360px;
+			flex-direction: row;
+			flex-wrap: wrap;
+			gap: 6px;
+			padding-top: 4px;
+		}
+
+		.stat-block {
+			flex: 1 1 28%;
+			min-width: 72px;
+		}
+
+		#geologyStatus {
+			flex: 1 1 100%;
+		}
+
+		.controls { display: none; }
+
+		.touch-controls {
+			display: flex;
+			width: 100%;
+		}
+
+		.touch-row {
+			max-width: none;
+			width: 100%;
+		}
+	}
 </style>
 </head>
 <body>
@@ -242,6 +405,10 @@
 				<p class="tagline">Natural mineral growth · cyclic twinning</p>
 				<p class="blink">START = DESCEND</p>
 				<p class="blink" style="margin-top:8px">A = AUTO-MINE</p>
+				<div class="touch-title-actions">
+					<button type="button" class="touch-btn" id="touchStart">DESCEND</button>
+					<button type="button" class="touch-btn" id="touchAuto">AUTO-MINE</button>
+				</div>
 			</div>
 			<div class="overlay pause-overlay" id="pauseOverlay">
 				<h2>CAVERN HOLD</h2>
@@ -309,6 +476,24 @@
 				Start = mine · Select = AI<br>
 				← → ↓ move · Space / RT = hard drop<br>
 				Z X / A B rotate · D-pad / stick
+			</div>
+		</div>
+	</div>
+
+	<div class="touch-controls" id="touchControls" aria-label="Touch controls">
+		<div class="touch-row">
+			<div class="touch-dpad">
+				<button type="button" class="touch-btn touch-up" data-touch="ArrowUp" aria-label="Rotate">↻</button>
+				<button type="button" class="touch-btn touch-left" data-touch="ArrowLeft" aria-label="Move left">◀</button>
+				<button type="button" class="touch-btn touch-down" data-touch="ArrowDown" aria-label="Soft drop">▼</button>
+				<button type="button" class="touch-btn touch-right" data-touch="ArrowRight" aria-label="Move right">▶</button>
+			</div>
+			<div class="touch-actions">
+				<button type="button" class="touch-btn touch-rotate" data-touch="z" aria-label="Rotate left">⟲</button>
+				<button type="button" class="touch-btn touch-rotate" data-touch="x" aria-label="Rotate right">⟳</button>
+				<button type="button" class="touch-btn touch-drop" data-touch=" " aria-label="Hard drop">DROP</button>
+				<button type="button" class="touch-btn touch-menu" data-touch="Enter" aria-label="Pause">PAUSE</button>
+				<button type="button" class="touch-btn touch-menu" data-touch="a" aria-label="Toggle AI">AI</button>
 			</div>
 		</div>
 	</div>
@@ -2521,6 +2706,80 @@ function setKbKey(k, down) {
 	else if (k.startsWith('Arrow')) kb[k] = down;
 }
 
+function setTouchKey(k, down) {
+	setKbKey(k, down);
+}
+
+function bindTouchButton(btn) {
+	const key = btn.getAttribute('data-touch');
+	if (!key) return;
+
+	const press = (e) => {
+		e.preventDefault();
+		ensureAudio();
+		setTouchKey(key, true);
+		btn.classList.add('pressed');
+		try { btn.setPointerCapture(e.pointerId); } catch {}
+	};
+
+	const release = (e) => {
+		e.preventDefault();
+		setTouchKey(key, false);
+		btn.classList.remove('pressed');
+		try { btn.releasePointerCapture(e.pointerId); } catch {}
+	};
+
+	btn.addEventListener('pointerdown', press);
+	btn.addEventListener('pointerup', release);
+	btn.addEventListener('pointercancel', release);
+	btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+function initTouchControls() {
+	if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+		document.documentElement.classList.add('has-touch');
+	}
+
+	const root = document.getElementById('touchControls');
+	if (root) {
+		root.querySelectorAll('[data-touch]').forEach(bindTouchButton);
+	}
+
+	const touchStart = document.getElementById('touchStart');
+	const touchAuto = document.getElementById('touchAuto');
+
+	if (touchStart) {
+		touchStart.addEventListener('click', (e) => {
+			e.preventDefault();
+			ensureAudio();
+			if (gameState === State.TITLE) startGame(false);
+			else if (gameState === State.GAME_OVER) startGame(selfPlay);
+			else togglePause();
+		});
+	}
+
+	if (touchAuto) {
+		touchAuto.addEventListener('click', (e) => {
+			e.preventDefault();
+			ensureAudio();
+			if (gameState === State.TITLE) startGame(true);
+			else if (gameState === State.GAME_OVER) startGame(true);
+			else if (gameState === State.PLAYING) {
+				selfPlay = !selfPlay;
+				modeLabel.textContent = selfPlay ? 'AUTO' : 'MINE';
+				aiMoveCounter = 0;
+			}
+		});
+	}
+
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'hidden') {
+			for (const k of Object.keys(kb)) kb[k] = false;
+			document.querySelectorAll('.touch-btn.pressed').forEach(b => b.classList.remove('pressed'));
+		}
+	});
+}
+
 document.addEventListener('keydown', (e) => {
 	const k = e.key;
 	if (['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'Enter', ' ', 'z', 'x', 'Z', 'X', 'a', 'A'].includes(k)) {
@@ -2585,6 +2844,7 @@ bestLevel = loadBestLevel();
 bestDepthEl.textContent = formatDepth(bestLevel);
 depthEl.textContent = formatDepth(0);
 
+initTouchControls();
 requestAnimationFrame(loop);
 </script>
 
