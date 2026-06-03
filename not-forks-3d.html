@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<!-- Not Forks 3D: COLS=14, ROWS=9, 26 pipe pieces + gopher. Hollow pipe rendering via Three.js -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120818">
+<title>Not Forks 3D</title>
+<link rel="icon" href="not-forks-3d-favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="not-forks-3d-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #08040f; font-family: 'Exo 2', system-ui, sans-serif; color: #ece4ff; }
+#app { display: flex; height: 100%; min-height: 0; }
+#viewport { flex: 1; position: relative; min-width: 0; overflow: hidden; }
+#viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#viewport canvas.dragging { cursor: grabbing; }
+#hud { width: 168px; flex-shrink: 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
+  background: linear-gradient(155deg, rgba(64,40,88,0.97), rgba(18,8,24,0.99)); border-left: 1px solid rgba(160,120,200,0.35); }
+.panel { padding: 10px 12px; background: rgba(16,10,28,0.72); border: 1px solid rgba(100,80,140,0.35); border-radius: 10px; }
+.panel label { display: block; font-size: 9px; font-weight: 600; letter-spacing: 1.8px; color: #9070b8; text-transform: uppercase; margin-bottom: 4px; }
+.panel .val { font-size: 22px; font-weight: 700; color: #f4eeff; }
+.panel .sub { font-size: 10px; color: #9888b0; margin-top: 3px; }
+.timer-bar { height: 10px; background: #140c20; border: 1px solid #504070; border-radius: 5px; margin-top: 6px; overflow: hidden; }
+.timer-fill { height: 100%; background: linear-gradient(90deg, #30a888, #70f0c8); transition: width 0.08s linear; }
+.timer-fill.low { background: linear-gradient(90deg, #c04060, #ff8098); }
+.hearts { display: flex; gap: 4px; font-size: 18px; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { flex: 1; min-width: 60px; padding: 8px; border: 1px solid #604880; border-radius: 6px; background: linear-gradient(180deg, #382050, #281838); color: #e8d8ff; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn.primary { background: linear-gradient(180deg, #308868, #206848); border-color: #50c898; }
+.btn.gold { background: linear-gradient(180deg, #806020, #604010); border-color: #c0a040; }
+.picker { display: flex; align-items: center; gap: 8px; }
+.picker-btn { width: 32px; height: 32px; border: 1px solid #604880; border-radius: 6px; background: #281838; color: #d0b8f0; cursor: pointer; font-family: inherit; }
+.picker-val { font-size: 12px; font-weight: 600; color: #70f0c8; flex: 1; text-align: center; }
+#next3d { width: 88px; height: 88px; display: block; margin: 6px auto 0; border-radius: 8px; background: #0a0612; }
+.overlay { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(40,24,64,0.9), rgba(6,3,12,0.94)); backdrop-filter: blur(8px); }
+.overlay h1 { font-family: Orbitron, 'Exo 2', sans-serif; font-size: clamp(20px,4vw,28px); letter-spacing: 4px;
+  background: linear-gradient(135deg, #fff0a0, #ffc840, #f08030); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.overlay h2 { font-size: 22px; color: #a890d0; margin-bottom: 8px; }
+.overlay p { font-size: 11px; color: #8878a8; max-width: 280px; line-height: 1.5; }
+.start-btn { margin-top: 12px; padding: 10px 28px; font-weight: 700; letter-spacing: 2px; border: none; border-radius: 8px;
+  background: linear-gradient(180deg, #40b888, #288868); color: #fff; cursor: pointer; font-family: inherit; }
+.flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%); font-family: Orbitron, 'Exo 2', sans-serif;
+  font-size: 18px; font-weight: 700; color: #ffe060; text-shadow: 0 0 20px rgba(255,220,80,0.9); pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 15; }
+.flash-msg.show { opacity: 1; }
+.gp-indicator {
+  position: absolute; top: 10px; right: 10px; z-index: 12;
+  display: none; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  color: #70f0c8; padding: 6px 10px;
+  background: rgba(16, 10, 28, 0.88); border: 1px solid rgba(80, 200, 168, 0.4);
+  border-radius: 8px; pointer-events: none;
+}
+.gp-indicator.show { display: flex; }
+#touchBar { display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: 8px; background: rgba(12,6,18,0.95); border-top: 1px solid #504070; z-index: 30; }
+#touchBar .touch-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.touch-btn { min-width: 48px; min-height: 48px; border: 2px solid #604880; border-radius: 10px; background: #281838; color: #e8d8ff; font-size: 16px; font-family: inherit; }
+.touch-btn.place { background: #206848; border-color: #50c898; font-size: 12px; }
+.status-bar strong { color: #60e8c8; }
+.hint-panel .good { color: #60e8c8; }
+.hint-panel .warn { color: #f0c060; }
+@media (max-width: 900px) { #hud { display: none; } #touchBar { display: block; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <span class="gp-indicator" id="gpIndicator" title="Gamepad">🎮</span>
+    <div class="flash-msg" id="flashMsg"></div>
+    <div class="overlay" id="titleOverlay" style="display:flex">
+      <h1>NOT FORKS 3D</h1>
+      <p>Grid snap · Z/X rotate · 15° tilt steps · gamepad supported</p>
+      <p style="margin-top:8px">Best: <span id="titleBest">0</span></p>
+      <button type="button" class="start-btn" id="startBtn">START</button>
+    </div>
+    <div class="overlay" id="pauseOverlay">
+      <h2>PAUSED</h2>
+      <p>P or Esc to resume</p>
+      <button type="button" class="start-btn" id="resumeBtn">RESUME</button>
+      <button type="button" class="btn" id="quitBtn" style="margin-top:8px">QUIT</button>
+    </div>
+    <div class="overlay" id="gameOverOverlay">
+      <h2>GAME OVER</h2>
+      <p id="gameOverText"></p>
+      <button type="button" class="start-btn" id="retryBtn">TRY AGAIN</button>
+    </div>
+  </div>
+  <aside id="hud">
+    <div class="panel"><label>Score</label><div class="val" id="points">0</div><div class="sub">Best: <span id="bestScore">0</span></div></div>
+    <div class="panel"><label>Loops</label><div class="val" id="loopCount">0</div><div class="sub" id="streakLabel">No streak</div></div>
+    <div class="panel"><label>Lives</label><div class="hearts" id="heartsEl"></div><div class="sub" id="livesSub"></div></div>
+    <div class="panel"><label>Timer</label><div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div><div class="sub" id="timerSec">—</div></div>
+    <div class="panel"><label>Next</label><canvas id="next3d" width="88" height="88"></canvas></div>
+    <div class="panel picker">
+      <button type="button" class="picker-btn" id="levelDown">−</button>
+      <span class="picker-val" id="levelLabel">Relaxed · Lv 0</span>
+      <button type="button" class="picker-btn" id="levelUp">+</button>
+    </div>
+    <div class="panel btn-row">
+      <button type="button" class="btn" id="btnRotate">Rotate</button>
+      <button type="button" class="btn primary" id="btnPlace">Place</button>
+    </div>
+    <div class="panel btn-row">
+      <button type="button" class="btn gold" id="btnSkip">Skip</button>
+      <button type="button" class="btn" id="btnPause">Pause</button>
+    </div>
+    <div class="panel status-bar" id="statusBar">Grid move · Space/A place · Z/X grid rotate · Q/E F/G T/H 15° tilt</div>
+    <div class="panel hint-panel" id="hintPanel"></div>
+  </aside>
+</div>
+<div id="touchBar">
+  <div class="touch-row">
+    <button type="button" class="touch-btn" data-act="up">▲</button>
+    <button type="button" class="touch-btn" data-act="left">◀</button>
+    <button type="button" class="touch-btn" data-act="down">▼</button>
+    <button type="button" class="touch-btn" data-act="right">▶</button>
+    <button type="button" class="touch-btn" data-act="rotate-ccw">⟲</button>
+    <button type="button" class="touch-btn" data-act="rotate">⟳</button>
+    <button type="button" class="touch-btn place" data-act="place">PLACE</button>
+    <button type="button" class="touch-btn" data-act="pause">⏸</button>
+  </div>
+  <div class="touch-row">
+    <button type="button" class="touch-btn" data-act="yaw-left" title="Yaw left">↶Y</button>
+    <button type="button" class="touch-btn" data-act="yaw-right" title="Yaw right">Y↷</button>
+    <button type="button" class="touch-btn" data-act="pitch-up" title="Pitch up">F↑</button>
+    <button type="button" class="touch-btn" data-act="pitch-down" title="Pitch down">F↓</button>
+    <button type="button" class="touch-btn" data-act="roll-left" title="Roll left">T↺</button>
+    <button type="button" class="touch-btn" data-act="roll-right" title="Roll right">T↻</button>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+
+
+const COLS = 14, ROWS = 9, TILE = 22, PAD = 7;
+const CANVAS_W = COLS * TILE + PAD * 2;
+const CANVAS_H = ROWS * TILE + PAD * 2;
+
+const N = 1, E = 2, S = 4, W = 8;
+const OPP = { [N]: S, [E]: W, [S]: N, [W]: E };
+const DIR_DX = { [E]: 1, [W]: -1, [S]: 0, [N]: 0 };
+const DIR_DY = { [E]: 0, [W]: 0, [S]: 1, [N]: -1 };
+
+const State = { TITLE: 0, PLAYING: 1, PAUSED: 2, GAME_OVER: 3 };
+
+const DIFFICULTIES = [
+	{ id: 'relaxed', label: 'Relaxed', timerMul: 1.6, lifeBonus: 2, simpleMul: 2.5, gopherRate: 0.06 },
+	{ id: 'normal',  label: 'Normal',  timerMul: 1.2, lifeBonus: 0, simpleMul: 1.5, gopherRate: 0.04 },
+	{ id: 'classic', label: 'Classic', timerMul: 1.0, lifeBonus: 0, simpleMul: 1.0, gopherRate: 0.03 },
+];
+
+const BASE_TIMER = [22000, 20000, 18000, 16000, 14000, 12000, 10000, 9000, 8000, 7000];
+const SCORE_PER_TILE = [10, 15, 20, 30, 40, 50, 60, 75, 90, 100];
+const CLEAR_BONUS = [5000, 8000, 12000, 16000, 20000, 25000, 30000, 40000, 50000, 75000];
+const FULL_BOARD_BONUS = [8000, 15000, 22000, 30000, 40000, 50000, 60000, 70000, 85000, 100000];
+const EXTRA_LIFE_POINTS = 20000;
+
+const TIPS = [
+	'Click any empty tile to snap the piece there.',
+	'Build two loops at once — you never know what piece comes next.',
+	'Straight pipes come in 1-tile and 3-tile lengths. Avoid 2-tile gaps.',
+	'Big loops score much more than tiny ones.',
+	'Every 20,000 points earns an extra life (up to your max).',
+	'The golden gopher clears incomplete pipe paths — use it wisely.',
+	'Hold arrow keys to slide the piece quickly.',
+	'Press R to rotate the other direction.',
+	'Completing a loop adds +5 seconds to the timer.',
+];
+
+function c(dx, dy, mask) { return { dx, dy, mask }; }
+
+const PIECE_DEFS = [
+	// ── Basics (level 0) ──
+	{ id: 'corner', cells: [c(0, 0, N | E)], weight: 12, minLevel: 0, simple: true },
+	{ id: 'straight1', cells: [c(0, 0, N | S)], weight: 12, minLevel: 0, simple: true },
+	{ id: 'straight2h', cells: [c(0, 0, E | W), c(1, 0, E | W)], weight: 10, minLevel: 0, simple: true },
+	{ id: 'straight2v', cells: [c(0, 0, N | S), c(0, 1, N | S)], weight: 10, minLevel: 0, simple: true },
+	{ id: 'straight3h', cells: [c(0, 0, E | W), c(1, 0, E | W), c(2, 0, E | W)], weight: 7, minLevel: 0, simple: true },
+	{ id: 'straight3v', cells: [c(0, 0, N | S), c(0, 1, N | S), c(0, 2, N | S)], weight: 7, minLevel: 0, simple: true },
+	{ id: 'ell2', cells: [c(0, 0, S | E), c(0, 1, N)], weight: 8, minLevel: 0, simple: true },
+	{ id: 'ell3', cells: [c(0, 0, S), c(0, 1, N | E), c(1, 1, W | N), c(1, 0, S)], weight: 5, minLevel: 1, simple: true },
+	{ id: 's_bend', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N)], weight: 10, minLevel: 0, simple: true },
+	{ id: 'z_shape', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W)], weight: 9, minLevel: 0, simple: true },
+	{ id: 'u_shape', cells: [c(0, 0, S), c(1, 0, S), c(1, 1, N | W), c(0, 1, N | E)], weight: 9, minLevel: 0, simple: true },
+
+	// ── Medium (level 1–2) ──
+	{ id: 's_mirror', cells: [c(0, 1, E), c(1, 1, W | N), c(1, 0, S)], weight: 7, minLevel: 1, simple: true },
+	{ id: 'z_vert', cells: [c(0, 0, S), c(0, 1, N | E), c(1, 1, W | S), c(1, 2, N)], weight: 7, minLevel: 1, simple: true },
+	{ id: 'u_wide', cells: [c(0, 0, N | S), c(0, 1, N | E), c(1, 1, E | W), c(2, 1, W | N), c(2, 0, N | S)], weight: 6, minLevel: 1, simple: true },
+	{ id: 's_long', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W | S), c(2, 2, N)], weight: 5, minLevel: 2, simple: true },
+	{ id: 'z_long', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W | S), c(2, 2, N | E), c(3, 2, W)], weight: 4, minLevel: 2, simple: false },
+	{ id: 'wave', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W)], weight: 5, minLevel: 2, simple: true },
+	{ id: 'long4h', cells: [c(0, 0, E | W), c(1, 0, E | W), c(2, 0, E | W), c(3, 0, E | W)], weight: 3, minLevel: 2, simple: false },
+	{ id: 'long4v', cells: [c(0, 0, N | S), c(0, 1, N | S), c(0, 2, N | S), c(0, 3, N | S)], weight: 3, minLevel: 2, simple: false },
+	{ id: 'long5h', cells: [c(0, 0, E | W), c(1, 0, E | W), c(2, 0, E | W), c(3, 0, E | W), c(4, 0, E | W)], weight: 2, minLevel: 3, simple: false },
+	{ id: 'long5v', cells: [c(0, 0, N | S), c(0, 1, N | S), c(0, 2, N | S), c(0, 3, N | S), c(0, 4, N | S)], weight: 2, minLevel: 3, simple: false },
+
+	// ── Complex (level 3+) ──
+	{ id: 'hook', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W)], weight: 4, minLevel: 3, simple: false },
+	{ id: 'spiral', cells: [c(0, 0, N | S), c(0, 1, N | E), c(1, 1, S | W), c(1, 2, N | S)], weight: 3, minLevel: 4, simple: false },
+	{ id: 'block4', cells: [c(0, 0, S | W), c(0, 1, N | E), c(1, 1, N | W), c(1, 0, S)], weight: 3, minLevel: 4, simple: false },
+	{ id: 'ring3', cells: [c(0, 0, S | E), c(1, 0, W | S), c(1, 1, N | W)], weight: 2, minLevel: 5, simple: false },
+	{ id: 'snake5', cells: [c(0, 0, E), c(1, 0, W | S), c(1, 1, N | E), c(2, 1, W | S), c(2, 2, N)], weight: 2, minLevel: 5, simple: false },
+];
+
+const GOPHER_DEF = { id: 'gopher', cells: [c(0, 0, 0)], special: 'gopher', weight: 1, minLevel: 0, simple: true };
+
+function emptyBoard() {
+	return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+}
+
+
+
+// ─── 3D RENDERING (hollow pipes) ───────────────────────────────────────────────
+const TILE_SIZE = 1.0;
+const BOARD_OX = -COLS * TILE_SIZE / 2;
+const BOARD_OZ = -ROWS * TILE_SIZE / 2;
+const PIPE = { outer: 0.2, inner: 0.115, seg: 16, arm: TILE_SIZE * 0.46 };
+const GHOST_LIFT = 0.55;
+const ELBOW_R = TILE_SIZE * 0.38;
+const ORIENT_STEP_3D = Math.PI / 12;
+
+function applyOrientStepsGroup(group, steps) {
+	if (!steps) return;
+	group.rotation.order = 'YXZ';
+	group.rotation.set(
+		steps.pitch * ORIENT_STEP_3D,
+		steps.yaw * ORIENT_STEP_3D,
+		steps.roll * ORIENT_STEP_3D
+	);
+}
+
+const viewport = document.getElementById('viewport');
+let renderer = null;
+let canvas3d = null;
+let glReady = false;
+
+const sceneDirty = { board: true, ghost: true };
+function markBoardDirty() { sceneDirty.board = true; }
+function markGhostDirty() { sceneDirty.ghost = true; }
+function markSceneDirty() { sceneDirty.board = true; sceneDirty.ghost = true; }
+
+const SHARED_GEOMS = new Set();
+function shareGeom(g) {
+	SHARED_GEOMS.add(g);
+	return g;
+}
+
+const GEOM = {
+	hub: shareGeom(new THREE.RingGeometry(PIPE.inner, PIPE.outer, PIPE.seg)),
+	cap: shareGeom(new THREE.RingGeometry(PIPE.inner * 1.02, PIPE.outer * 0.98, PIPE.seg)),
+	elbow: shareGeom(new THREE.TorusGeometry(
+		ELBOW_R, (PIPE.outer - PIPE.inner) * 0.48, 10, PIPE.seg, Math.PI / 2
+	)),
+	gopher: shareGeom(new THREE.SphereGeometry(0.28, 12, 10)),
+	particle: shareGeom(new THREE.SphereGeometry(0.06, 6, 6)),
+};
+
+function disposeGroupContents(group) {
+	while (group.children.length) {
+		const child = group.children[0];
+		group.remove(child);
+		child.traverse((node) => {
+			if (node.geometry && !SHARED_GEOMS.has(node.geometry)) node.geometry.dispose();
+		});
+	}
+}
+
+function createRenderer() {
+	glReady = false;
+	if (renderer) {
+		try { renderer.dispose(); } catch {}
+		if (canvas3d?.parentNode) canvas3d.parentNode.removeChild(canvas3d);
+		renderer = null;
+		canvas3d = null;
+	}
+	try {
+		renderer = new THREE.WebGLRenderer({
+			antialias: false,
+			alpha: false,
+			powerPreference: 'default',
+			failIfMajorPerformanceCaveat: false,
+		});
+	} catch (err) {
+		console.warn('WebGL unavailable', err);
+		return;
+	}
+	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+	renderer.setClearColor(0x08040f);
+	renderer.shadowMap.enabled = false;
+	canvas3d = renderer.domElement;
+	const gl = renderer.getContext();
+	if (!gl || gl.isContextLost()) {
+		try { renderer.dispose(); } catch {}
+		renderer = null;
+		canvas3d = null;
+		return;
+	}
+
+	canvas3d.addEventListener('webglcontextlost', (e) => {
+		e.preventDefault();
+		glReady = false;
+	}, false);
+	canvas3d.addEventListener('webglcontextrestored', () => {
+		glReady = !renderer.getContext()?.isContextLost();
+		if (glReady) {
+			markSceneDirty();
+			updateScene();
+			resize();
+		}
+	}, false);
+	const existing = viewport.querySelector('canvas');
+	if (existing && existing !== canvas3d) existing.remove();
+	viewport.appendChild(canvas3d);
+	glReady = true;
+}
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x08040f, 18, 42);
+
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 80);
+const CAM = { dist: 16, yaw: 0.65, pitch: 0.52, targetY: 0.35 };
+function updateCamera() {
+	const cp = Math.cos(CAM.pitch);
+	camera.position.set(
+		CAM.dist * Math.sin(CAM.yaw) * cp,
+		CAM.dist * Math.sin(CAM.pitch) + CAM.targetY,
+		CAM.dist * Math.cos(CAM.yaw) * cp
+	);
+	camera.lookAt(0, CAM.targetY, 0);
+}
+
+scene.add(new THREE.AmbientLight(0x304060, 0.55));
+const keyLight = new THREE.DirectionalLight(0xc0e8ff, 1.1);
+keyLight.position.set(6, 14, 8);
+scene.add(keyLight);
+const rim = new THREE.DirectionalLight(0x40d0b0, 0.45);
+rim.position.set(-8, 6, -6);
+scene.add(rim);
+
+const boardGroup = new THREE.Group();
+const ghostGroup = new THREE.Group();
+const particleGroup = new THREE.Group();
+const floorGroup = new THREE.Group();
+scene.add(floorGroup, boardGroup, ghostGroup, particleGroup);
+
+const matPipe = new THREE.MeshStandardMaterial({
+	color: 0x28b898, metalness: 0.35, roughness: 0.4,
+	emissive: 0x186858, emissiveIntensity: 0.35,
+});
+const matPipeFlash = new THREE.MeshStandardMaterial({
+	color: 0x60f0d0, metalness: 0.4, roughness: 0.3,
+	emissive: 0x40e8c8, emissiveIntensity: 0.9,
+});
+const matInner = new THREE.MeshStandardMaterial({
+	color: 0x061210, metalness: 0.1, roughness: 0.85, side: THREE.DoubleSide,
+});
+const matGhostOk = new THREE.MeshStandardMaterial({
+	color: 0x40d0b0, transparent: true, opacity: 0.55,
+	emissive: 0x30a888, emissiveIntensity: 0.5,
+});
+const matGhostBad = new THREE.MeshStandardMaterial({
+	color: 0xf05070, transparent: true, opacity: 0.5,
+	emissive: 0x802030, emissiveIntensity: 0.4,
+});
+const matGopher = new THREE.MeshStandardMaterial({
+	color: 0xf0c040, metalness: 0.5, roughness: 0.35,
+	emissive: 0x806020, emissiveIntensity: 0.6,
+});
+const matCap = new THREE.MeshStandardMaterial({
+	color: 0x80ffe0, emissive: 0x40f0c0, emissiveIntensity: 0.8,
+	transparent: true, opacity: 0.85,
+});
+
+const hollowGeomCache = new Map();
+function hollowTubeGeom(length) {
+	const key = length.toFixed(3);
+	if (hollowGeomCache.has(key)) return hollowGeomCache.get(key);
+	const shape = new THREE.Shape();
+	shape.absarc(0, 0, PIPE.outer, 0, Math.PI * 2, false);
+	const hole = new THREE.Path();
+	hole.absarc(0, 0, PIPE.inner, 0, Math.PI * 2, true);
+	shape.holes.push(hole);
+	const g = new THREE.ExtrudeGeometry(shape, {
+		depth: length, bevelEnabled: false, curveSegments: PIPE.seg, steps: 1,
+	});
+	g.translate(0, 0, -length / 2);
+	shareGeom(g);
+	hollowGeomCache.set(key, g);
+	return g;
+}
+
+const DIR_VEC = {
+	[N]: new THREE.Vector3(0, 0, -1),
+	[E]: new THREE.Vector3(1, 0, 0),
+	[S]: new THREE.Vector3(0, 0, 1),
+	[W]: new THREE.Vector3(-1, 0, 0),
+};
+
+function orientArm(mesh, dir) {
+	const v = DIR_VEC[dir];
+	const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), v);
+	mesh.quaternion.copy(q);
+}
+
+function orientAlong(mesh, from, to) {
+	const dir = new THREE.Vector3().subVectors(to, from);
+	const len = dir.length();
+	if (len < 1e-4) return len;
+	dir.normalize();
+	const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+	mesh.quaternion.copy(q);
+	mesh.position.copy(from).addScaledVector(dir, len / 2);
+	return len;
+}
+
+function isOpposite(d1, d2) {
+	return (d1 & OPP[d2]) !== 0;
+}
+
+function cellWorldPos(gx, gy, lift = 0) {
+	return new THREE.Vector3(
+		BOARD_OX + (gx + 0.5) * TILE_SIZE,
+		lift,
+		BOARD_OZ + (gy + 0.5) * TILE_SIZE
+	);
+}
+
+function neighborMask(gx, gy, dir) {
+	const nx = gx + DIR_DX[dir], ny = gy + DIR_DY[dir];
+	if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return 0;
+	return board[ny][nx]?.mask ?? 0;
+}
+
+function addPortCapAt(group, pos, dir, material) {
+	const v = DIR_VEC[dir];
+	const ring = new THREE.Mesh(GEOM.cap, material);
+	ring.position.copy(pos);
+	ring.lookAt(pos.clone().add(v));
+	group.add(ring);
+}
+
+function addHollowTubeBetween(group, from, to, material) {
+	const len = from.distanceTo(to);
+	if (len < 1e-4) return;
+	const arm = new THREE.Mesh(hollowTubeGeom(len * 0.98), material);
+	orientAlong(arm, from, to);
+	group.add(arm);
+}
+
+function addExternalArm(group, center, dir, material, capMat, showCap) {
+	const v = DIR_VEC[dir];
+	const len = PIPE.arm;
+	const arm = new THREE.Mesh(hollowTubeGeom(len), material);
+	arm.position.copy(center).addScaledVector(v, len / 2);
+	orientArm(arm, dir);
+	group.add(arm);
+	if (showCap) {
+		const end = center.clone().addScaledVector(v, len);
+		addPortCapAt(group, end, dir, capMat);
+	}
+}
+
+function addElbow(group, center, dir1, dir2, material) {
+	const v1 = DIR_VEC[dir1];
+	const v2 = DIR_VEC[dir2];
+	const torus = new THREE.Mesh(GEOM.elbow, material);
+	torus.rotation.x = Math.PI / 2;
+	const a1 = Math.atan2(v1.x, v1.z);
+	const a2 = Math.atan2(v2.x, v2.z);
+	torus.rotation.y = (a1 + a2) / 2 - Math.PI / 4;
+	const corner = center.clone().add(
+		v1.clone().add(v2).normalize().multiplyScalar(ELBOW_R * 0.65)
+	);
+	torus.position.copy(corner);
+	group.add(torus);
+	const hub = new THREE.Mesh(GEOM.hub, material);
+	hub.rotation.x = -Math.PI / 2;
+	hub.position.copy(center);
+	group.add(hub);
+}
+
+/** One welded pipe assembly from a set of connected cells. */
+function buildUnifiedPipeAssembly(entries, options) {
+	const {
+		material,
+		capMaterial = matCap,
+		local = false,
+		centerOffset = { cx: 0, cy: 0 },
+		showAllCaps = false,
+		openPort = null,
+	} = options;
+	const group = new THREE.Group();
+	const map = new Map();
+
+	for (const e of entries) {
+		const lx = local ? e.dx - centerOffset.cx : e.gx;
+		const ly = local ? e.dy - centerOffset.cy : e.gy;
+		map.set(`${lx},${ly}`, { mask: e.mask, lx, ly, gx: e.gx, gy: e.gy });
+	}
+
+	const centerAt = (lx, ly) => new THREE.Vector3(
+		local ? lx * TILE_SIZE : BOARD_OX + (lx + 0.5) * TILE_SIZE,
+		0.04,
+		local ? ly * TILE_SIZE : BOARD_OZ + (ly + 0.5) * TILE_SIZE
+	);
+
+	const hasPartner = (lx, ly, dir) => {
+		const nx = lx + DIR_DX[dir], ny = ly + DIR_DY[dir];
+		const p = map.get(`${nx},${ny}`);
+		return p && (p.mask & OPP[dir]);
+	};
+
+	const segKey = (ax, ay, bx, by) => (ax < bx || (ax === bx && ay < by) ? `${ax},${ay}|${bx},${by}` : `${bx},${by}|${ax},${ay}`);
+	const addedSeg = new Set();
+
+	for (const { lx, ly, mask, gx, gy } of map.values()) {
+		const c = centerAt(lx, ly);
+		const dirs = [N, E, S, W].filter(d => mask & d);
+
+		if (dirs.length === 2 && !isOpposite(dirs[0], dirs[1])) {
+			addElbow(group, c, dirs[0], dirs[1], material);
+		} else if (dirs.length >= 3) {
+			const hub = new THREE.Mesh(GEOM.hub, material);
+			hub.rotation.x = -Math.PI / 2;
+			hub.position.copy(c);
+			group.add(hub);
+		}
+
+		for (const dir of dirs) {
+			if (hasPartner(lx, ly, dir)) {
+				const nx = lx + DIR_DX[dir], ny = ly + DIR_DY[dir];
+				const key = segKey(lx, ly, nx, ny);
+				if (addedSeg.has(key)) continue;
+				addedSeg.add(key);
+				addHollowTubeBetween(group, c, centerAt(nx, ny), material);
+			} else {
+				let cap = showAllCaps;
+				if (!cap && openPort) {
+					const wx = local ? (gx ?? lx) : lx;
+					const wy = local ? (gy ?? ly) : ly;
+					cap = openPort(wx, wy, dir);
+				}
+				addExternalArm(group, c, dir, material, capMaterial, cap);
+			}
+		}
+	}
+	return group;
+}
+
+function buildPieceMesh(cells, px, py, material, lift) {
+	const cen = pieceCenter(cells);
+	const entries = cells.map(({ dx, dy, mask }) => ({
+		dx, dy, mask, gx: px + dx, gy: py + dy,
+	}));
+	const group = buildUnifiedPipeAssembly(entries, {
+		local: true,
+		centerOffset: cen,
+		material,
+		showAllCaps: true,
+	});
+	group.position.copy(cellWorldPos(px + cen.cx, py + cen.cy, lift));
+	return group;
+}
+
+function buildPipeCell(gx, gy, mask, material, isGopher, setWorldPos = true) {
+	const group = new THREE.Group();
+	if (isGopher) {
+		const sphere = new THREE.Mesh(GEOM.gopher, matGopher);
+		sphere.position.y = 0.32;
+		if (setWorldPos) group.position.copy(cellWorldPos(gx, gy));
+		return group;
+	}
+	const groupMesh = buildUnifiedPipeAssembly([{ gx, gy, mask }], {
+		material,
+		openPort: (x, y, dir) => !(neighborMask(x, y, dir) & OPP[dir]),
+	});
+	group.add(groupMesh);
+	if (setWorldPos) group.position.set(0, 0, 0);
+	return group;
+}
+
+function collectPlaceIdGroups() {
+	const groups = new Map();
+	for (let y = 0; y < ROWS; y++) {
+		for (let x = 0; x < COLS; x++) {
+			const cell = board[y][x];
+			if (!cell?.placeId) continue;
+			if (!groups.has(cell.placeId)) groups.set(cell.placeId, []);
+			groups.get(cell.placeId).push({ gx: x, gy: y, mask: cell.mask });
+		}
+	}
+	return groups;
+}
+
+function syncBoardMeshes() {
+	disposeGroupContents(boardGroup);
+
+	const placeGroups = collectPlaceIdGroups();
+	const drawnPlace = new Set();
+
+	for (const [pid, entries] of placeGroups) {
+		const flash = entries.some(({ gx, gy }) => loopFlashCells.has(`${gx},${gy}`));
+		const mesh = buildUnifiedPipeAssembly(entries, {
+			material: flash ? matPipeFlash : matPipe,
+			openPort: (gx, gy, dir) => !(neighborMask(gx, gy, dir) & OPP[dir]),
+		});
+		const ref = entries[0];
+		const placed = board[ref.gy]?.[ref.gx];
+		if (placed?.orientSteps) applyOrientStepsGroup(mesh, placed.orientSteps);
+		boardGroup.add(mesh);
+		for (const { gx, gy } of entries) drawnPlace.add(`${gx},${gy}`);
+	}
+
+	for (let y = 0; y < ROWS; y++) {
+		for (let x = 0; x < COLS; x++) {
+			if (drawnPlace.has(`${x},${y}`)) continue;
+			const cell = board[y][x];
+			if (!cell) continue;
+			const flash = loopFlashCells.has(`${x},${y}`);
+			boardGroup.add(buildPipeCell(x, y, cell.mask, flash ? matPipeFlash : matPipe, false));
+		}
+	}
+}
+
+function applyPieceOrientation(group) {
+	if (!piece) return;
+	if (piece.orientSteps) applyOrientStepsGroup(group, piece.orientSteps);
+	else if (piece.orient) {
+		group.rotation.order = 'YXZ';
+		group.rotation.set(piece.orient.x, piece.orient.y, piece.orient.z);
+	}
+}
+
+function updateGhostOrientation() {
+	if (!piece || !ghostGroup.children.length) return;
+	applyPieceOrientation(ghostGroup.children[0]);
+}
+
+function syncGhostMesh() {
+	disposeGroupContents(ghostGroup);
+	if (!piece || gameState !== State.PLAYING) return;
+	const ok = canPlaceCurrent(piece.cells, piece.px, piece.py, piece.def);
+	const mat = ok ? matGhostOk : matGhostBad;
+	if (piece.def.special === 'gopher') {
+		const g = buildPipeCell(piece.px, piece.py, 0, matGopher, true);
+		g.position.y = GHOST_LIFT;
+		ghostGroup.add(g);
+		return;
+	}
+	const g = buildPieceMesh(piece.cells, piece.px, piece.py, mat, GHOST_LIFT);
+	applyPieceOrientation(g);
+	ghostGroup.add(g);
+}
+
+let floorBuilt = false;
+const floorTileMats = [
+	new THREE.MeshStandardMaterial({ color: 0x100818, metalness: 0.1, roughness: 0.9 }),
+	new THREE.MeshStandardMaterial({ color: 0x0c0610, metalness: 0.1, roughness: 0.9 }),
+];
+const floorTileGeom = shareGeom(new THREE.BoxGeometry(TILE_SIZE * 0.92, 0.02, TILE_SIZE * 0.92));
+const floorPlateGeom = shareGeom(new THREE.BoxGeometry(COLS * TILE_SIZE + 0.4, 0.12, ROWS * TILE_SIZE + 0.4));
+
+function buildFloor() {
+	if (floorBuilt) return;
+	floorBuilt = true;
+	const plate = new THREE.Mesh(
+		floorPlateGeom,
+		new THREE.MeshStandardMaterial({ color: 0x0a0612, metalness: 0.2, roughness: 0.85 })
+	);
+	plate.position.set(0, -0.06, 0);
+	floorGroup.add(plate);
+
+	const grid = new THREE.GridHelper(COLS * TILE_SIZE, COLS, 0x304050, 0x1a2030);
+	grid.position.y = 0.001;
+	floorGroup.add(grid);
+
+	for (let y = 0; y < ROWS; y++) {
+		for (let x = 0; x < COLS; x++) {
+			const tile = new THREE.Mesh(floorTileGeom, floorTileMats[(x + y) % 2]);
+			tile.position.copy(cellWorldPos(x, y, 0.01));
+			floorGroup.add(tile);
+		}
+	}
+}
+
+let particles3d = [];
+function spawnParticles3d(loop) {
+	for (const key of loop) {
+		const [x, y] = key.split(',').map(Number);
+		const p = cellWorldPos(x, y, 0.3);
+		for (let i = 0; i < 4; i++) {
+			particles3d.push({
+				mesh: null,
+				x: p.x + (Math.random() - 0.5) * 0.4,
+				y: 0.3 + Math.random() * 0.5,
+				z: p.z + (Math.random() - 0.5) * 0.4,
+				vx: (Math.random() - 0.5) * 0.04,
+				vy: 0.02 + Math.random() * 0.03,
+				vz: (Math.random() - 0.5) * 0.04,
+				life: 1,
+			});
+		}
+	}
+	const mat = new THREE.MeshBasicMaterial({ color: 0x80ffe0, transparent: true });
+	for (const pt of particles3d.slice(-loop.size * 4)) {
+		const m = new THREE.Mesh(GEOM.particle, mat);
+		m.position.set(pt.x, pt.y, pt.z);
+		particleGroup.add(m);
+		pt.mesh = m;
+	}
+}
+
+function updateParticles(dt) {
+	tickParticles();
+	for (let i = particles3d.length - 1; i >= 0; i--) {
+		const p = particles3d[i];
+		p.life -= dt / 600;
+		p.y += p.vy * dt * 0.06;
+		p.x += p.vx * dt;
+		p.z += p.vz * dt;
+		if (p.mesh) {
+			p.mesh.position.set(p.x, p.y, p.z);
+			p.mesh.material.opacity = Math.max(0, p.life);
+		}
+		if (p.life <= 0) {
+			if (p.mesh) {
+				particleGroup.remove(p.mesh);
+				if (p.mesh.material) p.mesh.material.dispose();
+			}
+			particles3d.splice(i, 1);
+		}
+	}
+}
+
+function updateScene({ board = true, ghost = true } = {}) {
+	if (board) sceneDirty.board = true;
+	if (ghost) sceneDirty.ghost = true;
+	if (sceneDirty.board) {
+		syncBoardMeshes();
+		sceneDirty.board = false;
+	}
+	if (sceneDirty.ghost) {
+		syncGhostMesh();
+		sceneDirty.ghost = false;
+	} else {
+		updateGhostOrientation();
+	}
+}
+
+function refreshGhostMaterial() {
+	if (!piece || gameState !== State.PLAYING) return;
+	const ok = canPlaceCurrent(piece.cells, piece.px, piece.py, piece.def);
+	const want = ok ? matGhostOk : matGhostBad;
+	const g = ghostGroup.children[0];
+	if (!g) {
+		markGhostDirty();
+		return;
+	}
+	g.traverse((node) => {
+		if (node.isMesh && node.material !== matGopher) node.material = want;
+	});
+}
+
+function drawNextPreview3d() {
+	const c = document.getElementById('next3d');
+	if (!c || !nextPieceDef) return;
+	const ctx = c.getContext('2d');
+	ctx.fillStyle = '#0a0612';
+	ctx.fillRect(0, 0, 88, 88);
+	if (nextPieceDef.special === 'gopher') {
+		ctx.fillStyle = '#f0c040';
+		ctx.beginPath();
+		ctx.arc(44, 44, 18, 0, Math.PI * 2);
+		ctx.fill();
+		return;
+	}
+	const cells = nextPieceDef.cells;
+	const b = pieceBounds(cells);
+	const scale = 14;
+	const ox = 44 - ((b.minX + b.maxX) / 2) * scale;
+	const oy = 44 - ((b.minY + b.maxY) / 2) * scale;
+	ctx.strokeStyle = '#40d0b0';
+	ctx.lineWidth = 5;
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
+	const drawn = new Set();
+	for (const { dx, dy, mask } of cells) {
+		const cx = ox + dx * scale, cy = oy + dy * scale;
+		for (const dir of [N, E, S, W]) {
+			if (!(mask & dir)) continue;
+			const nx = dx + DIR_DX[dir], ny = dy + DIR_DY[dir];
+			const n = cells.find(c => c.dx === nx && c.dy === ny);
+			if (n && (n.mask & OPP[dir])) {
+				const key = dx < nx || (dx === nx && dy < ny) ? `${dx},${dy}|${nx},${ny}` : `${nx},${ny}|${dx},${dy}`;
+				if (drawn.has(key)) continue;
+				drawn.add(key);
+				ctx.beginPath();
+				ctx.moveTo(cx, cy);
+				ctx.lineTo(ox + nx * scale, oy + ny * scale);
+				ctx.stroke();
+			} else {
+				const ex = cx + DIR_DX[dir] * scale * 0.45;
+				const ey = cy + DIR_DY[dir] * scale * 0.45;
+				ctx.beginPath();
+				ctx.moveTo(cx, cy);
+				ctx.lineTo(ex, ey);
+				ctx.stroke();
+			}
+		}
+	}
+}
+
+// Raycast pick + orbit
+const raycaster = new THREE.Raycaster();
+const pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const mouse = new THREE.Vector2();
+let viewDrag = { active: false, id: null, x: 0, y: 0, moved: false };
+
+function resize() {
+	if (!renderer || !glReady) return;
+	const w = viewport.clientWidth, h = viewport.clientHeight;
+	renderer.setSize(w, h, false);
+	camera.aspect = w / h;
+	camera.updateProjectionMatrix();
+}
+
+function pointerSurface() {
+	return canvas3d || viewport;
+}
+
+function pointerToNDC(e) {
+	const el = pointerSurface();
+	const r = el.getBoundingClientRect();
+	if (!r.width || !r.height) return;
+	mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+	mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+}
+
+function pickGrid(e) {
+	pointerToNDC(e);
+	raycaster.setFromCamera(mouse, camera);
+	const hit = new THREE.Vector3();
+	if (!raycaster.ray.intersectPlane(pickPlane, hit)) return null;
+	const gx = Math.floor((hit.x - BOARD_OX) / TILE_SIZE);
+	const gy = Math.floor((hit.z - BOARD_OZ) / TILE_SIZE);
+	if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return null;
+	return { gx, gy };
+}
+
+function endDrag(e) {
+	if (e.pointerId !== viewDrag.id) return;
+	const surface = pointerSurface();
+	surface.classList.remove('dragging');
+	if (viewDrag.active && !viewDrag.moved && gameState === State.PLAYING) {
+		const cell = pickGrid(e);
+		if (cell) {
+			movePieceToGrid(cell.gx, cell.gy);
+			updateScene({ board: false, ghost: true });
+			refreshGhostMaterial();
+			updateHint();
+		}
+	}
+	viewDrag.active = false;
+	try { surface.releasePointerCapture(e.pointerId); } catch {}
+}
+
+function bindViewportInput() {
+	if (!viewport || viewport.dataset.inputBound) return;
+	viewport.dataset.inputBound = '1';
+	viewport.addEventListener('pointerdown', (e) => {
+		if (e.button !== 0) return;
+		viewDrag = { active: true, id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+		pointerSurface().classList.add('dragging');
+		try { pointerSurface().setPointerCapture(e.pointerId); } catch {}
+	});
+	viewport.addEventListener('pointermove', (e) => {
+		if (!viewDrag.active || e.pointerId !== viewDrag.id) return;
+		const dx = e.clientX - viewDrag.x;
+		const dy = e.clientY - viewDrag.y;
+		if (Math.abs(dx) + Math.abs(dy) > 5) viewDrag.moved = true;
+		if (viewDrag.moved) {
+			CAM.yaw -= dx * 0.006;
+			CAM.pitch = Math.max(0.15, Math.min(1.1, CAM.pitch + dy * 0.004));
+			viewDrag.x = e.clientX;
+			viewDrag.y = e.clientY;
+			updateCamera();
+		}
+	});
+	viewport.addEventListener('pointerup', endDrag);
+	viewport.addEventListener('pointercancel', endDrag);
+}
+bindViewportInput();
+
+window.addEventListener('pageshow', (e) => {
+	if (e.persisted) {
+		createRenderer();
+		if (glReady) {
+			markSceneDirty();
+			updateScene();
+			resize();
+		}
+	}
+});
+
+function init3d() {
+	createRenderer();
+	if (!glReady) return;
+	new ResizeObserver(resize).observe(viewport);
+	resize();
+	buildFloor();
+	updateCamera();
+	loadBest();
+	if (!nextPieceDef) nextPieceDef = pickPieceDef();
+	markSceneDirty();
+	updateScene();
+	requestAnimationFrame(tick);
+}
+
+// Touch bar
+document.querySelectorAll('#touchBar [data-act]').forEach(btn => {
+	btn.addEventListener('click', () => {
+		const act = btn.dataset.act;
+		if (gameState === State.TITLE) { startGame(); return; }
+		if (gameState === State.PAUSED && act === 'pause') { resumeGame(); return; }
+		if (gameState !== State.PLAYING) return;
+		if (act === 'up') movePiece(0, -1);
+		else if (act === 'down') movePiece(0, 1);
+		else if (act === 'left') movePiece(-1, 0);
+		else if (act === 'right') movePiece(1, 0);
+		else if (act === 'rotate') rotatePiece(1);
+		else if (act === 'rotate-ccw') rotatePiece(-1);
+		else if (act === 'yaw-left') tiltPiece('y', -1);
+		else if (act === 'yaw-right') tiltPiece('y', 1);
+		else if (act === 'pitch-up') tiltPiece('x', 1);
+		else if (act === 'pitch-down') tiltPiece('x', -1);
+		else if (act === 'roll-left') tiltPiece('z', -1);
+		else if (act === 'roll-right') tiltPiece('z', 1);
+		else if (act === 'place') placePiece();
+		else if (act === 'pause') togglePause();
+		updateScene();
+		updateHint();
+	});
+});
+
+// ─── DOM ────────────────────────────────────────────────────────────────────────
+const titleOverlay = document.getElementById('titleOverlay');
+const pauseOverlay = document.getElementById('pauseOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const gameOverText = document.getElementById('gameOverText');
+const flashMsg = document.getElementById('flashMsg');
+const levelLabel = document.getElementById('levelLabel');
+const loopCountEl = document.getElementById('loopCount');
+const pointsEl = document.getElementById('points');
+const bestScoreEl = document.getElementById('bestScore');
+const titleBestEl = document.getElementById('titleBest');
+const heartsEl = document.getElementById('heartsEl');
+const livesSubEl = document.getElementById('livesSub');
+const timerFillEl = document.getElementById('timerFill');
+const timerSecEl = document.getElementById('timerSec');
+const streakLabel = document.getElementById('streakLabel');
+const statusBar = document.getElementById('statusBar');
+const hintPanel = document.getElementById('hintPanel');
+const startBtn = document.getElementById('startBtn');
+const resumeBtn = document.getElementById('resumeBtn');
+const quitBtn = document.getElementById('quitBtn');
+const retryBtn = document.getElementById('retryBtn');
+const levelDown = document.getElementById('levelDown');
+const levelUp = document.getElementById('levelUp');
+const btnRotate = document.getElementById('btnRotate');
+const btnPlace = document.getElementById('btnPlace');
+const btnSkip = document.getElementById('btnSkip');
+const btnPause = document.getElementById('btnPause');
+const touchHint = null;
+const titleBest2El = null;
+const mPointsEl = null;
+const mLivesEl = null;
+const mTimerEl = null;
+const mPauseBtn = null;
+const statusPauseBtn = null;
+const soundToggle = null;
+const touchControlsToggle = null;
+const gpIndicator = document.getElementById('gpIndicator');
+const fsToast = null;
+const nextCanvas = null;
+const nextCtx = null;
+const mNextCanvas = null;
+const mNextCtx = null;
+
+// ─── STATE ──────────────────────────────────────────────────────────────────────
+let gameState = State.TITLE;
+let diffIndex = 0;
+let level = 0;
+let board = emptyBoard();
+let piece = null;
+let nextPieceDef = null;
+let loopsCompleted = 0;
+let points = 0;
+let bestScore = 0;
+let lives = 3;
+let maxLives = 5;
+let nextExtraLifeAt = EXTRA_LIFE_POINTS;
+let timerMax = BASE_TIMER[0];
+let timerLeft = timerMax;
+let piecesPlaced = 0;
+let nextPlaceId = 1;
+let streak = 0;
+let flashTimer = 0;
+let audioCtx = null;
+let soundOn = true;
+let hoverCell = null;
+let particles = [];
+let loopFlashCells = new Set();
+let loopFlashTimer = 0;
+let dasDir = null;
+let dasTimer = 0;
+let tipIndex = 0;
+const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+let onScreenControls = false;
+let ptrStart = null;
+let ptrMoved = false;
+const SWIPE_MIN = 24;
+
+const keys = {};
+let prevKeys = {};
+
+// ─── PERSISTENCE ────────────────────────────────────────────────────────────────
+function loadBest() {
+	try { bestScore = parseInt(localStorage.getItem('notforks3d_best') || localStorage.getItem('notforks_best') || '0', 10) || 0; } catch {}
+	if (bestScoreEl) bestScoreEl.textContent = bestScore;
+	if (titleBestEl) titleBestEl.textContent = bestScore;
+}
+
+function saveBest() {
+	if (points > bestScore) {
+		bestScore = points;
+		try { localStorage.setItem('notforks3d_best', String(bestScore)); } catch {}
+		if (bestScoreEl) bestScoreEl.textContent = bestScore;
+		if (titleBestEl) titleBestEl.textContent = bestScore;
+	}
+}
+
+// ─── AUDIO ──────────────────────────────────────────────────────────────────────
+function ensureAudio() {
+	if (!audioCtx) {
+		try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+	}
+	return audioCtx;
+}
+
+function tone(freq, dur, type = 'square', vol = 0.07) {
+	if (!soundOn) return;
+	const ac = ensureAudio();
+	if (!ac) return;
+	const osc = ac.createOscillator();
+	const gain = ac.createGain();
+	osc.type = type;
+	osc.frequency.value = freq;
+	gain.gain.setValueAtTime(vol, ac.currentTime);
+	gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+	osc.connect(gain);
+	gain.connect(ac.destination);
+	osc.start();
+	osc.stop(ac.currentTime + dur);
+}
+
+function sfxPlace() { tone(240, 0.05); }
+function sfxRotate() { tone(360, 0.04, 'triangle'); }
+function sfxLoop(n) {
+	tone(420 + n * 3, 0.15, 'square', 0.09);
+	setTimeout(() => tone(660 + n * 2, 0.2, 'triangle', 0.06), 60);
+}
+function sfxLife() { tone(110, 0.25, 'sawtooth', 0.06); }
+function sfxClear() { tone(880, 0.12); setTimeout(() => tone(1100, 0.18), 80); }
+function sfxGopher() { tone(520, 0.07); setTimeout(() => tone(780, 0.1), 50); }
+function sfxBonus() { tone(523, 0.1); setTimeout(() => tone(659, 0.1), 90); setTimeout(() => tone(784, 0.15), 180); }
+
+// ─── PIECE LOGIC ────────────────────────────────────────────────────────────────
+function diff() { return DIFFICULTIES[diffIndex]; }
+
+function rotateMask(mask, turns) {
+	let m = mask;
+	for (let t = 0; t < turns; t++) {
+		let nm = 0;
+		if (m & N) nm |= E;
+		if (m & E) nm |= S;
+		if (m & S) nm |= W;
+		if (m & W) nm |= N;
+		m = nm;
+	}
+	return m;
+}
+
+// 90° clockwise in screen space (y increases downward): (x, y) → (-y, x)
+function rotateCells(cells, turns) {
+	return cells.map(({ dx, dy, mask }) => {
+		let x = dx, y = dy;
+		for (let t = 0; t < turns; t++) {
+			const nx = -y;
+			const ny = x;
+			x = nx;
+			y = ny;
+		}
+		return { dx: x, dy: y, mask: rotateMask(mask, turns) };
+	});
+}
+
+function validatePieceCells(cells) {
+	const map = new Map();
+	for (const { dx, dy, mask } of cells) map.set(`${dx},${dy}`, mask);
+	const keys = [...map.keys()];
+	const errors = [];
+
+	for (const [k, m] of map) {
+		const [x, y] = k.split(',').map(Number);
+		for (const dir of [N, E, S, W]) {
+			if (!(m & dir)) continue;
+			const nx = x + DIR_DX[dir], ny = y + DIR_DY[dir];
+			const nk = `${nx},${ny}`;
+			if (map.has(nk) && !(map.get(nk) & OPP[dir])) {
+				errors.push(`edge ${k}→${nk}`);
+			}
+		}
+	}
+
+	const seen = new Set([keys[0]]);
+	const stack = [keys[0]];
+	while (stack.length) {
+		const k = stack.pop();
+		const [x, y] = k.split(',').map(Number);
+		const m = map.get(k);
+		for (const dir of [N, E, S, W]) {
+			if (!(m & dir)) continue;
+			const nk = `${x + DIR_DX[dir]},${y + DIR_DY[dir]}`;
+			if (map.has(nk) && map.get(nk) & OPP[dir] && !seen.has(nk)) {
+				seen.add(nk);
+				stack.push(nk);
+			}
+		}
+	}
+	if (seen.size !== keys.length) errors.push(`disconnected (${seen.size}/${keys.length})`);
+
+	let extPorts = 0;
+	for (const [k, m] of map) {
+		const [x, y] = k.split(',').map(Number);
+		for (const dir of [N, E, S, W]) {
+			if (!(m & dir)) continue;
+			const nk = `${x + DIR_DX[dir]},${y + DIR_DY[dir]}`;
+			if (!map.has(nk)) extPorts++;
+		}
+	}
+	if (extPorts !== 2) errors.push(`needs exactly 2 external ports (has ${extPorts})`);
+
+	return errors;
+}
+
+/** Strip dangling ports and add an outward opening on each path endpoint. */
+function normalizePieceCells(cells) {
+	const keyed = cells.map(c => ({ dx: c.dx, dy: c.dy, mask: c.mask }));
+	const map = new Map(keyed.map(c => [`${c.dx},${c.dy}`, c]));
+	let minX = 0, maxX = 0, minY = 0, maxY = 0;
+	for (const c of keyed) {
+		minX = Math.min(minX, c.dx); maxX = Math.max(maxX, c.dx);
+		minY = Math.min(minY, c.dy); maxY = Math.max(maxY, c.dy);
+	}
+	for (const cell of keyed) {
+		let mask = cell.mask;
+		for (const dir of [N, E, S, W]) {
+			if (!(mask & dir)) continue;
+			const nx = cell.dx + DIR_DX[dir], ny = cell.dy + DIR_DY[dir];
+			if (!map.has(`${nx},${ny}`) && nx >= minX && nx <= maxX && ny >= minY && ny <= maxY) {
+				mask &= ~dir;
+			}
+		}
+		const internal = [];
+		let hasExternal = false;
+		for (const dir of [N, E, S, W]) {
+			if (!(mask & dir)) continue;
+			const nx = cell.dx + DIR_DX[dir], ny = cell.dy + DIR_DY[dir];
+			if (map.has(`${nx},${ny}`)) internal.push(dir);
+			else hasExternal = true;
+		}
+		if (internal.length === 1 && !hasExternal) mask |= OPP[internal[0]];
+		cell.mask = mask;
+	}
+	return keyed;
+}
+
+function validateAllRotations(def) {
+	for (let r = 0; r < 4; r++) {
+		const errs = validatePieceCells(rotateCells(def.cells, r));
+		if (errs.length) console.error(`Invalid piece ${def.id} @ rot${r}:`, errs);
+	}
+	const back = rotateCells(rotateCells(def.cells, 1), 3);
+	const a = def.cells.map(c => `${c.dx},${c.dy},${c.mask}`).sort().join('|');
+	const b = back.map(c => `${c.dx},${c.dy},${c.mask}`).sort().join('|');
+	if (a !== b) console.error(`Rotation round-trip failed: ${def.id}`);
+}
+
+for (const def of PIECE_DEFS) {
+	def.cells = normalizePieceCells(def.cells);
+	validateAllRotations(def);
+}
+
+function pieceCenter(cells) {
+	const b = pieceBounds(cells);
+	return { cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
+}
+
+function pieceBounds(cells) {
+	let minX = 0, maxX = 0, minY = 0, maxY = 0;
+	for (const { dx, dy } of cells) {
+		minX = Math.min(minX, dx); maxX = Math.max(maxX, dx);
+		minY = Math.min(minY, dy); maxY = Math.max(maxY, dy);
+	}
+	return { minX, maxX, minY, maxY };
+}
+
+function pieceEffectiveWeight(def, d) {
+	let w = def.weight;
+	if (def.special === 'gopher') return w;
+	if (def.simple) w *= d.simpleMul;
+	if (piecesPlaced < 12) w *= def.simple ? 1.8 : 0.5;
+	return w;
+}
+
+function pickWeighted(pool, weights) {
+	const total = weights.reduce((sum, w) => sum + w, 0);
+	if (total <= 0) return pool[0];
+	let r = Math.random() * total;
+	for (let i = 0; i < pool.length; i++) {
+		if (r < weights[i]) return pool[i];
+		r -= weights[i];
+	}
+	return pool[pool.length - 1];
+}
+
+function pickPieceDef() {
+	const d = diff();
+	const pool = PIECE_DEFS.filter(p => p.minLevel <= level);
+	const weights = pool.map(p => pieceEffectiveWeight(p, d));
+	let total = weights.reduce((sum, w) => sum + w, 0);
+
+	if (piecesPlaced > 4 && total > 0 && d.gopherRate > 0) {
+		const gopherW = total * d.gopherRate / (1 - d.gopherRate);
+		pool.push(GOPHER_DEF);
+		weights.push(gopherW);
+	}
+
+	return pickWeighted(pool, weights);
+}
+
+// ─── 6DOF ORIENTATION GRID (15° steps; yaw synced to Z/X grid rotation) ───────────
+const ORIENT_STEP = Math.PI / 12;
+const ORIENT_YAW_STEPS_PER_90 = 3;
+const ORIENT_PITCH_MIN = -6;
+const ORIENT_PITCH_MAX = 6;
+const ORIENT_YAW_STEPS = 24;
+const ORIENT_ROLL_STEPS = 24;
+
+function defaultOrientSteps(rotation = 0) {
+	return { pitch: 0, yaw: yawStepsForRotation(rotation), roll: 0 };
+}
+function yawStepsForRotation(rot) {
+	return ((rot % 4) + 4) % 4 * ORIENT_YAW_STEPS_PER_90;
+}
+function orientStepsToEuler(steps) {
+	return {
+		x: steps.pitch * ORIENT_STEP,
+		y: steps.yaw * ORIENT_STEP,
+		z: steps.roll * ORIENT_STEP,
+	};
+}
+function wrapOrientStep(v, mod) {
+	return ((v % mod) + mod) % mod;
+}
+function snapOrientSteps(steps) {
+	return {
+		pitch: Math.max(ORIENT_PITCH_MIN, Math.min(ORIENT_PITCH_MAX, Math.round(steps.pitch))),
+		yaw: wrapOrientStep(Math.round(steps.yaw), ORIENT_YAW_STEPS),
+		roll: wrapOrientStep(Math.round(steps.roll), ORIENT_ROLL_STEPS),
+	};
+}
+function copyOrientSteps(steps) {
+	return { pitch: steps.pitch, yaw: steps.yaw, roll: steps.roll };
+}
+function syncOrientFromSteps(p) {
+	if (!p.orientSteps) p.orientSteps = defaultOrientSteps(p.rotation);
+	p.orientSteps = snapOrientSteps(p.orientSteps);
+	p.orient = orientStepsToEuler(p.orientSteps);
+}
+function syncOrientToGridRotation(p) {
+	if (!p.orientSteps) p.orientSteps = defaultOrientSteps(p.rotation);
+	p.orientSteps.yaw = yawStepsForRotation(p.rotation);
+	syncOrientFromSteps(p);
+}
+function gridSnapPiecePose(p) {
+	syncOrientFromSteps(p);
+}
+
+function makePiece(def, rotation) {
+	const cells = rotateCells(def.cells, rotation);
+	const orientSteps = defaultOrientSteps(rotation);
+	return { def, rotation, cells, px: 0, py: 0, orientSteps, orient: orientStepsToEuler(orientSteps) };
+}
+
+function centerPiece(p) {
+	const bounds = pieceBounds(p.cells);
+	p.px = Math.floor((COLS - (bounds.maxX - bounds.minX + 1)) / 2) - bounds.minX;
+	p.py = Math.max(0, 2) - bounds.minY;
+}
+
+function spawnPiece(fromQueue) {
+	const def = fromQueue ? nextPieceDef : pickPieceDef();
+	nextPieceDef = pickPieceDef();
+	const rotation = Math.floor(Math.random() * 4);
+	piece = makePiece(def, rotation);
+	centerPiece(piece);
+	resetTimer();
+	drawNextPreview3d();
+}
+
+function resetTimer() {
+	const d = diff();
+	timerMax = BASE_TIMER[Math.min(level, 9)] * d.timerMul;
+	timerLeft = timerMax;
+}
+
+function inBounds(cells, px, py) {
+	for (const { dx, dy } of cells) {
+		const x = px + dx, y = py + dy;
+		if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+	}
+	return true;
+}
+
+function canPlace(cells, px, py) {
+	if (!inBounds(cells, px, py)) return false;
+	for (const { dx, dy } of cells) {
+		if (board[py + dy][px + dx] !== null) return false;
+	}
+	return true;
+}
+
+/** Active piece may float over occupied tiles while moving. */
+function canFloat(cells, px, py) {
+	return inBounds(cells, px, py);
+}
+
+function gopherHitsPipe(cells, px, py) {
+	for (const { dx, dy } of cells) {
+		if (board[py + dy][px + dx] !== null) return true;
+	}
+	return false;
+}
+
+function canPlaceGopher(cells, px, py) {
+	return inBounds(cells, px, py) && gopherHitsPipe(cells, px, py);
+}
+
+function canPlaceCurrent(cells, px, py, def) {
+	if (def?.special === 'gopher') return canPlaceGopher(cells, px, py);
+	return canPlace(cells, px, py);
+}
+
+function findNearPlacement(gx, gy) {
+	if (!piece) return null;
+	for (const [dx, dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2],[-1,-1],[1,1],[-1,1],[1,-1]]) {
+		const px = gx + dx, py = gy + dy;
+		if (canFloat(piece.cells, px, py)) return { px, py };
+	}
+	return null;
+}
+
+function movePieceToGrid(gx, gy) {
+	if (!piece) return;
+	const spot = findNearPlacement(gx, gy);
+	if (spot) {
+		piece.px = spot.px;
+		piece.py = spot.py;
+		return;
+	}
+	// Snap anchor directly to tapped cell when piece fits on board
+	const bounds = pieceBounds(piece.cells);
+	if (canFloat(piece.cells, gx - bounds.minX, gy - bounds.minY)) {
+		piece.px = gx - bounds.minX;
+		piece.py = gy - bounds.minY;
+	} else if (canFloat(piece.cells, gx, gy)) {
+		piece.px = gx;
+		piece.py = gy;
+	}
+}
+
+function wouldCompleteLoop(cells, px, py) {
+	if (!canPlace(cells, px, py)) return false;
+	const saved = [];
+	for (const { dx, dy, mask } of cells) {
+		const x = px + dx, y = py + dy;
+		saved.push([x, y, board[y][x]]);
+		board[y][x] = { mask, pieceId: 'test' };
+	}
+	const loops = findCompletedLoops();
+	for (const [x, y, prev] of saved) board[y][x] = prev;
+	return loops.length > 0;
+}
+
+// ─── PLACEMENT & LOOPS ──────────────────────────────────────────────────────────
+function placePiece() {
+	if (!piece || gameState !== State.PLAYING) return false;
+	const { cells, px, py, def } = piece;
+
+	if (def.special === 'gopher') {
+		if (!canPlaceGopher(cells, px, py)) {
+			statusBar.innerHTML = '<span class="warn">Place gopher on existing pipes to clear them</span>';
+			return false;
+		}
+		clearIncompleteAt(px + cells[0].dx, py + cells[0].dy);
+		sfxGopher();
+		piecesPlaced++;
+		piece = null;
+		spawnPiece(true);
+		return true;
+	}
+
+	if (!canPlace(cells, px, py)) return false;
+	gridSnapPiecePose(piece);
+	const placedOrient = copyOrientSteps(piece.orientSteps);
+	const placeId = nextPlaceId++;
+	for (const { dx, dy, mask } of cells) {
+		board[py + dy][px + dx] = { mask, pieceId: def.id, placeId, orientSteps: placedOrient };
+	}
+	sfxPlace();
+	piecesPlaced++;
+
+	const loops = findCompletedLoops();
+	if (loops.length) {
+		for (const loop of loops) {
+			loopFlashCells = new Set(loop);
+			loopFlashTimer = 18;
+			spawnParticles(loop);
+			for (const key of loop) {
+				const [x, y] = key.split(',').map(Number);
+				board[y][x] = null;
+			}
+			const tileCount = loop.size;
+			const mult = 1 + Math.min(streak, 10) * 0.1;
+			const score = Math.round(scoreLoop(tileCount) * mult);
+			points += score;
+			loopsCompleted++;
+			streak++;
+			timerLeft = Math.min(timerMax, timerLeft + 5000);
+			sfxLoop(tileCount);
+			showFlash(`+${score}${streak > 1 ? ' ×' + streak : ''}`);
+		}
+	} else {
+		streak = 0;
+	}
+
+	if (isBoardEmpty()) {
+		const bonus = CLEAR_BONUS[Math.min(level, 9)];
+		points += bonus;
+		showFlash(`CLEAR +${bonus}`);
+		sfxClear();
+		sfxBonus();
+	}
+
+	if (isBoardFull()) {
+		const bonus = FULL_BOARD_BONUS[Math.min(level, 9)];
+		points += bonus;
+		if (lives < maxLives) lives = maxLives;
+		showFlash(`FULL LOOP +${bonus}`);
+		sfxBonus();
+	}
+
+	checkExtraLife();
+
+	piece = null;
+	spawnPiece(true);
+	updateHUD();
+	updateHint();
+	return true;
+}
+
+function skipPiece() {
+	if (!piece || gameState !== State.PLAYING || lives <= 1) return;
+	lives--;
+	streak = 0;
+	sfxLife();
+	showFlash('SKIPPED');
+	piece = null;
+	spawnPiece(true);
+	updateHUD();
+}
+
+function isBoardEmpty() {
+	for (let y = 0; y < ROWS; y++)
+		for (let x = 0; x < COLS; x++)
+			if (board[y][x] !== null) return false;
+	return true;
+}
+
+function isBoardFull() {
+	for (let y = 0; y < ROWS; y++)
+		for (let x = 0; x < COLS; x++)
+			if (board[y][x] === null) return false;
+	return true;
+}
+
+function scoreLoop(tiles) {
+	const base = SCORE_PER_TILE[Math.min(level, 9)] * tiles;
+	const complexity = tiles >= 20 ? 3 : tiles >= 10 ? 2 : 1;
+	return base * complexity;
+}
+
+function checkExtraLife() {
+	let earned = 0;
+	while (points >= nextExtraLifeAt && lives < maxLives) {
+		lives++;
+		nextExtraLifeAt += EXTRA_LIFE_POINTS;
+		earned++;
+	}
+	if (earned) {
+		showFlash(earned > 1 ? `+${earned} LIVES` : 'EXTRA LIFE');
+		sfxBonus();
+	}
+}
+
+function cellMask(x, y) { return board[y]?.[x]?.mask ?? 0; }
+
+function neighbors(x, y, mask) {
+	const list = [];
+	for (const dir of [N, E, S, W]) {
+		if (!(mask & dir)) continue;
+		const nx = x + DIR_DX[dir], ny = y + DIR_DY[dir];
+		if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+		if (cellMask(nx, ny) & OPP[dir]) list.push([nx, ny]);
+	}
+	return list;
+}
+
+function connectedComponent(sx, sy) {
+	if (!cellMask(sx, sy)) return new Set();
+	const comp = new Set();
+	const stack = [[sx, sy]];
+	const key = (x, y) => `${x},${y}`;
+	comp.add(key(sx, sy));
+	while (stack.length) {
+		const [x, y] = stack.pop();
+		for (const [nx, ny] of neighbors(x, y, cellMask(x, y))) {
+			const k = key(nx, ny);
+			if (!comp.has(k)) { comp.add(k); stack.push([nx, ny]); }
+		}
+	}
+	return comp;
+}
+
+function componentDegree(comp) {
+	const degs = new Map();
+	for (const k of comp) {
+		const [x, y] = k.split(',').map(Number);
+		const mask = cellMask(x, y);
+		let deg = 0;
+		for (const dir of [N, E, S, W]) {
+			if (!(mask & dir)) continue;
+			const nx = x + DIR_DX[dir], ny = y + DIR_DY[dir];
+			if (comp.has(`${nx},${ny}`)) deg++;
+		}
+		degs.set(k, deg);
+	}
+	return degs;
+}
+
+function extractCycle(comp, startKey) {
+	const cycle = [];
+	let cur = startKey, prev = null;
+	do {
+		cycle.push(cur);
+		const [x, y] = cur.split(',').map(Number);
+		const mask = cellMask(x, y);
+		let next = null;
+		for (const dir of [N, E, S, W]) {
+			if (!(mask & dir)) continue;
+			const nk = `${x + DIR_DX[dir]},${y + DIR_DY[dir]}`;
+			if (comp.has(nk) && nk !== prev) { next = nk; break; }
+		}
+		if (!next) return null;
+		prev = cur;
+		cur = next;
+	} while (cur !== startKey);
+	return new Set(cycle);
+}
+
+function findCompletedLoops() {
+	const visited = new Set();
+	const loops = [];
+	for (let y = 0; y < ROWS; y++) {
+		for (let x = 0; x < COLS; x++) {
+			const k = `${x},${y}`;
+			if (!cellMask(x, y) || visited.has(k)) continue;
+			const comp = connectedComponent(x, y);
+			for (const ck of comp) visited.add(ck);
+			const degs = componentDegree(comp);
+			if (![...degs.values()].every(d => d === 2)) continue;
+			const remaining = new Set(comp);
+			while (remaining.size) {
+				const start = remaining.values().next().value;
+				const cycle = extractCycle(comp, start);
+				if (cycle && cycle.size >= 3) {
+					loops.push(cycle);
+					for (const ck of cycle) remaining.delete(ck);
+				} else remaining.delete(start);
+			}
+		}
+	}
+	return loops;
+}
+
+function clearIncompleteAt(sx, sy) {
+	const comp = connectedComponent(sx, sy);
+	const degs = componentDegree(comp);
+	if ([...degs.values()].every(d => d === 2)) return;
+	for (const k of comp) {
+		const [x, y] = k.split(',').map(Number);
+		board[y][x] = null;
+	}
+}
+
+// ─── PARTICLES (3D) ─────────────────────────────────────────────────────────────
+function spawnParticles(loop) {
+	spawnParticles3d(loop);
+}
+function tickParticles() {}
+function drawParticles() {}
+
+// ─── INPUT ──────────────────────────────────────────────────────────────────────
+function movePiece(dx, dy) {
+	if (!piece) return;
+	if (canFloat(piece.cells, piece.px + dx, piece.py + dy)) {
+		piece.px += dx;
+		piece.py += dy;
+	}
+}
+
+function tiltPiece(axis, dir = 1) {
+	if (!piece || piece.def.special === 'gopher') return;
+	if (!piece.orientSteps) piece.orientSteps = defaultOrientSteps(piece.rotation);
+	if (axis === 'x') piece.orientSteps.pitch += dir;
+	else if (axis === 'y') piece.orientSteps.yaw += dir;
+	else if (axis === 'z') piece.orientSteps.roll += dir;
+	gridSnapPiecePose(piece);
+	sfxRotate();
+	updateHint();
+}
+
+function rotatePiece(dir = 1) {
+	if (!piece || piece.def.special === 'gopher') return;
+	const rot = (piece.rotation + dir + 4) % 4;
+	const newCells = rotateCells(piece.def.cells, rot);
+	const oldC = pieceCenter(piece.cells);
+	const newC = pieceCenter(newCells);
+	const gridCx = piece.px + oldC.cx;
+	const gridCy = piece.py + oldC.cy;
+	let px = Math.round(gridCx - newC.cx);
+	let py = Math.round(gridCy - newC.cy);
+	const nudges = [[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1],[-1,1],[1,-1],[2,0],[-2,0],[0,2],[0,-2]];
+	for (const [dx, dy] of nudges) {
+		if (canFloat(newCells, px + dx, py + dy)) {
+			piece.rotation = rot;
+			piece.cells = newCells;
+			piece.px = px + dx;
+			piece.py = py + dy;
+			syncOrientToGridRotation(piece);
+			sfxRotate();
+			updateHint();
+			return;
+		}
+	}
+}
+
+function tickDas() {
+	const dirs = [
+		['ArrowLeft', -1, 0], ['ArrowRight', 1, 0],
+		['ArrowUp', 0, -1], ['ArrowDown', 0, 1],
+	];
+	for (const [key, dx, dy] of dirs) {
+		if (keys[key]) {
+			if (dasDir !== key) {
+				dasDir = key;
+				dasTimer = 0;
+				movePiece(dx, dy);
+			} else {
+				dasTimer++;
+				if (dasTimer > 12 && dasTimer % 4 === 0) movePiece(dx, dy);
+			}
+			return;
+		}
+	}
+	dasDir = null;
+	dasTimer = 0;
+}
+
+function handleInput() {
+	tickGamepad();
+
+	if (gameState === State.TITLE) return;
+	if (gameState === State.GAME_OVER) return;
+	if (gameState === State.PAUSED) {
+		if (edge('Enter') || edge('p') || edge('P') || edge('Escape')) resumeGame();
+		return;
+	}
+	if (gameState !== State.PLAYING) return;
+
+	if (edge('Enter') || edge('p') || edge('P') || edge('Escape') || edge('Pause')) {
+		pauseGame();
+		return;
+	}
+
+	tickDas();
+
+	if (edge('z') || edge('Z')) rotatePiece(1);
+	if (edge('x') || edge('X')) rotatePiece(-1);
+	if (edge(' ')) placePiece();
+	if (edge('q') || edge('Q')) tiltPiece('y', -1);
+	if (edge('e') || edge('E')) tiltPiece('y', 1);
+	if (edge('f') || edge('F')) tiltPiece('x', 1);
+	if (edge('g') || edge('G')) tiltPiece('x', -1);
+	if (edge('t') || edge('T')) tiltPiece('z', 1);
+	if (edge('h') || edge('H')) tiltPiece('z', -1);
+	if (edge('s') || edge('S')) skipPiece();
+}
+
+function edge(k) { return keys[k] && !prevKeys[k]; }
+
+// ─── GAMEPAD (Standard Gamepad API) ─────────────────────────────────────────────
+const GP_DEADZONE = 0.35;
+const GP = {
+	A: 0, B: 1, X: 2, Y: 3,
+	LB: 4, RB: 5, LT: 6, RT: 7,
+	SELECT: 8, START: 9,
+	L3: 10, R3: 11,
+	UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15,
+};
+
+let gpSlot = null;
+let prevGpSnap = null;
+let prevGpRt = 0;
+let prevGpLt = 0;
+let gpDasKey = null;
+let gpDasTimer = 0;
+let gpConnectedName = '';
+let gpStickQ = { x: 0, y: 0 };
+
+function pollGamepads() {
+	if (navigator.getGamepads) navigator.getGamepads();
+}
+
+function getActiveGamepad() {
+	pollGamepads();
+	const pads = navigator.getGamepads?.();
+	if (!pads) return null;
+	if (gpSlot !== null && pads[gpSlot]?.connected) return pads[gpSlot];
+	for (const gp of pads) {
+		if (gp?.connected) {
+			gpSlot = gp.index;
+			return gp;
+		}
+	}
+	gpSlot = null;
+	return null;
+}
+
+function gpSnapshot(gp) {
+	const buttons = [];
+	for (let i = 0; i < Math.max(gp.buttons.length, 16); i++) {
+		const b = gp.buttons[i];
+		buttons[i] = b ? (b.pressed ? 1 : b.value) : 0;
+	}
+	return {
+		buttons,
+		axes: gp.axes.map(a => a),
+		lt: gp.buttons[GP.LT]?.value ?? 0,
+		rt: gp.buttons[GP.RT]?.value ?? 0,
+	};
+}
+
+function gpDown(snap, idx) {
+	return (snap.buttons[idx] ?? 0) > 0.55;
+}
+
+function gpEdge(snap, idx) {
+	return gpDown(snap, idx) && !(prevGpSnap && gpDown(prevGpSnap, idx));
+}
+
+function gpTriggerEdge(cur, prev, threshold = 0.65) {
+	return cur > threshold && prev <= threshold;
+}
+
+function gpMoveVector(snap) {
+	let dx = 0, dy = 0;
+	const lx = snap.axes[0] ?? 0;
+	const ly = snap.axes[1] ?? 0;
+	if (Math.abs(lx) > GP_DEADZONE) dx = lx > 0 ? 1 : -1;
+	if (Math.abs(ly) > GP_DEADZONE) dy = ly > 0 ? 1 : -1;
+	if (dx && dy) {
+		if (Math.abs(lx) >= Math.abs(ly)) dy = 0;
+		else dx = 0;
+	}
+	if (snap.axes.length >= 8) {
+		const hx = snap.axes[6], hy = snap.axes[7];
+		if (hx !== undefined && Math.abs(hx) > 0.5) dx = hx > 0 ? 1 : -1;
+		if (hy !== undefined && Math.abs(hy) > 0.5) dy = hy > 0 ? 1 : -1;
+	}
+	if (gpDown(snap, GP.LEFT)) dx = -1;
+	if (gpDown(snap, GP.RIGHT)) dx = 1;
+	if (gpDown(snap, GP.UP)) dy = -1;
+	if (gpDown(snap, GP.DOWN)) dy = 1;
+	return { dx, dy };
+}
+
+function tickGamepadDas(dx, dy) {
+	if (!dx && !dy) {
+		gpDasKey = null;
+		gpDasTimer = 0;
+		return;
+	}
+	const key = `${dx},${dy}`;
+	if (gpDasKey !== key) {
+		gpDasKey = key;
+		gpDasTimer = 0;
+		movePiece(dx, dy);
+	} else {
+		gpDasTimer++;
+		if (gpDasTimer > 10 && gpDasTimer % 3 === 0) movePiece(dx, dy);
+	}
+}
+
+function gpStartGame() {
+	ensureAudio();
+	startGame();
+}
+
+function gpRetryGame() {
+	ensureAudio();
+	gameOverOverlay.style.display = 'none';
+	startGame();
+}
+
+function gpShowTitle() {
+	quitToTitle();
+}
+
+function gpPlayingActions(snap) {
+	if (gpEdge(snap, GP.START) || gpEdge(snap, GP.SELECT)) {
+		pauseGame();
+		return;
+	}
+
+	const kbMoving = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
+	if (!kbMoving) {
+		const { dx, dy } = gpMoveVector(snap);
+		tickGamepadDas(dx, dy);
+	}
+
+	if (gpEdge(snap, GP.A) || gpTriggerEdge(snap.rt, prevGpRt)) placePiece();
+	if (gpEdge(snap, GP.X) || gpEdge(snap, GP.RB)) rotatePiece(1);
+	if (gpEdge(snap, GP.Y) || gpEdge(snap, GP.LB)) rotatePiece(-1);
+	if (gpEdge(snap, GP.B)) skipPiece();
+	if (gpEdge(snap, GP.L3)) tiltPiece('z', -1);
+	if (gpEdge(snap, GP.R3)) tiltPiece('z', 1);
+	if (gpTriggerEdge(snap.lt, prevGpLt)) tiltPiece('y', -1);
+	const rsX = snap.axes[2] || 0;
+	const rsY = snap.axes[3] || 0;
+	if (piece && piece.def.special !== 'gopher') {
+		const qx = Math.abs(rsX) > GP_DEADZONE ? (rsX > 0 ? 1 : -1) : 0;
+		const qy = Math.abs(rsY) > GP_DEADZONE ? (rsY > 0 ? 1 : -1) : 0;
+		let changed = false;
+		if (!piece.orientSteps) piece.orientSteps = defaultOrientSteps(piece.rotation);
+		if (qx !== gpStickQ.x && qx) { piece.orientSteps.yaw += qx; changed = true; }
+		if (qy !== gpStickQ.y && qy) { piece.orientSteps.pitch += qy; changed = true; }
+		gpStickQ.x = qx;
+		gpStickQ.y = qy;
+		if (changed) {
+			gridSnapPiecePose(piece);
+			updateGhostOrientation();
+		}
+	} else {
+		gpStickQ.x = 0;
+		gpStickQ.y = 0;
+	}
+}
+
+function tickGamepad() {
+	const gp = getActiveGamepad();
+	if (!gp) {
+		prevGpSnap = null;
+		prevGpRt = 0;
+		prevGpLt = 0;
+		gpDasKey = null;
+		gpDasTimer = 0;
+		updateGpIndicator(false);
+		return;
+	}
+
+	if (!gpConnectedName) {
+		gpConnectedName = (gp.id || 'Controller').replace(/\s*\([^)]*\)\s*$/, '').trim() || 'Controller';
+	}
+	const snap = gpSnapshot(gp);
+
+	if (gameState === State.TITLE) {
+		if (gpEdge(snap, GP.START) || gpEdge(snap, GP.A)) gpStartGame();
+		if (gpEdge(snap, GP.LEFT)) cycleLevel(-1);
+		if (gpEdge(snap, GP.RIGHT)) cycleLevel(1);
+		if (gpEdge(snap, GP.UP)) cycleDifficulty(1);
+		if (gpEdge(snap, GP.DOWN)) cycleDifficulty(-1);
+		if (gpEdge(snap, GP.SELECT)) cycleDifficulty(1);
+	} else if (gameState === State.GAME_OVER) {
+		if (gpEdge(snap, GP.START) || gpEdge(snap, GP.A)) gpRetryGame();
+		if (gpEdge(snap, GP.B) || gpEdge(snap, GP.SELECT)) gpShowTitle();
+	} else if (gameState === State.PAUSED) {
+		if (gpEdge(snap, GP.START) || gpEdge(snap, GP.A) || gpEdge(snap, GP.B) || gpEdge(snap, GP.SELECT)) {
+			resumeGame();
+		}
+		if (gpEdge(snap, GP.Y)) quitToTitle();
+	} else if (gameState === State.PLAYING) {
+		gpPlayingActions(snap);
+	}
+
+	prevGpLt = snap.lt;
+	prevGpRt = snap.rt;
+	prevGpSnap = snap;
+	updateGpIndicator(true);
+}
+
+function updateGpIndicator(active) {
+	if (!gpIndicator) return;
+	gpIndicator.classList.toggle('show', !!active);
+	if (active && gpConnectedName) {
+		gpIndicator.title = gpConnectedName + ' — stick move · A/RT place · X/Y rotate · B skip · right stick tilt';
+	}
+}
+
+function canvasToGrid(clientX, clientY) {
+	const rect = canvas.getBoundingClientRect();
+	const sx = (clientX - rect.left) / rect.width;
+	const sy = (clientY - rect.top) / rect.height;
+	const gx = Math.floor((sx * CANVAS_W - PAD) / TILE);
+	const gy = Math.floor((sy * CANVAS_H - PAD) / TILE);
+	if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) return { gx, gy };
+	return null;
+}
+
+// ─── GAME FLOW ──────────────────────────────────────────────────────────────────
+function updateLevelLabel() {
+	levelLabel.textContent = `${diff().label} · Lv ${level}`;
+}
+
+function cycleDifficulty(dir) {
+	diffIndex = (diffIndex + dir + DIFFICULTIES.length) % DIFFICULTIES.length;
+	updateLevelLabel();
+}
+
+function cycleLevel(dir) {
+	level = Math.max(0, Math.min(9, level + dir));
+	updateLevelLabel();
+}
+
+function startGame() {
+	nextPlaceId = 1;
+	ensureAudio();
+	gameState = State.PLAYING;
+	document.documentElement.classList.add('playing');
+	titleOverlay.style.display = 'none';
+	gameOverOverlay.style.display = 'none';
+	pauseOverlay.style.display = 'none';
+	board = emptyBoard();
+	loopsCompleted = 0;
+	points = 0;
+	streak = 0;
+	piecesPlaced = 0;
+	maxLives = 3 + diff().lifeBonus;
+	lives = maxLives;
+	nextExtraLifeAt = EXTRA_LIFE_POINTS;
+	nextPieceDef = pickPieceDef();
+	piece = null;
+	particles = [];
+	spawnPiece(true);
+	updateHUD();
+	updateHint();
+	statusBar.innerHTML = IS_TOUCH
+		? 'Tap tile · <strong>PLACE</strong> drop · gamepad: stick move · A place'
+		: 'Click tile · <strong>Space</strong> place · <strong>Z/X</strong> grid rotate · <strong>Q/E F/G T/H</strong> 15° tilt · gamepad';
+	if (touchHint) touchHint.textContent = 'Tap board to position · swipe to nudge · PLACE to drop';
+	updatePauseUI();
+	
+	
+}
+
+function updatePauseUI() {
+	const paused = gameState === State.PAUSED;
+	document.documentElement.classList.toggle('paused', paused);
+	if (btnPause) {
+		btnPause.textContent = paused ? 'Resume' : 'Pause';
+		btnPause.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+	}
+}
+
+function togglePause() {
+	if (gameState === State.PLAYING) pauseGame();
+	else if (gameState === State.PAUSED) resumeGame();
+}
+
+function pauseGame() {
+	if (gameState !== State.PLAYING) return;
+	gameState = State.PAUSED;
+	pauseOverlay.style.display = 'flex';
+	stopTouchRepeat();
+	stopMusic();
+	updatePauseUI();
+}
+
+function resumeGame() {
+	if (gameState !== State.PAUSED) return;
+	gameState = State.PLAYING;
+	pauseOverlay.style.display = 'none';
+	updatePauseUI();
+	
+}
+
+function quitToTitle() {
+	gameState = State.TITLE;
+	document.documentElement.classList.remove('playing', 'paused');
+	pauseOverlay.style.display = 'none';
+	gameOverOverlay.style.display = 'none';
+	titleOverlay.style.display = 'flex';
+	stopTouchRepeat();
+	stopMusic();
+	updatePauseUI();
+	
+}
+
+function loseLife() {
+	lives--;
+	streak = 0;
+	sfxLife();
+	updateHUD();
+	if (lives <= 0) {
+		saveBest();
+		gameState = State.GAME_OVER;
+		stopMusic();
+		gameOverText.innerHTML = `Loops completed: <strong>${loopsCompleted}</strong><br>Score: <strong>${points}</strong>${points >= bestScore ? '<br>New best!' : ''}`;
+		gameOverOverlay.style.display = 'flex';
+	} else {
+		showFlash('TIME UP');
+		spawnPiece(true);
+	}
+}
+
+function showFlash(text) {
+	flashTimer = 70;
+	flashMsg.textContent = text;
+	flashMsg.classList.add('show');
+}
+
+function updateHUD() {
+	if (timerFillEl && timerMax > 0) {
+		const pct = Math.max(0, (timerLeft / timerMax) * 100);
+		timerFillEl.style.width = `${pct}%`;
+		timerFillEl.classList.toggle('low', pct < 25);
+	}
+	if (timerSecEl) timerSecEl.textContent = timerMax > 0 ? `${Math.ceil(timerLeft / 1000)}s` : '—';
+	loopCountEl.textContent = loopsCompleted;
+	pointsEl.textContent = points;
+	streakLabel.textContent = streak > 1 ? `Streak ×${streak}` : 'No streak';
+	heartsEl.innerHTML = '';
+	let heartsStr = '';
+	for (let i = 0; i < maxLives; i++) {
+		const span = document.createElement('span');
+		const alive = i < lives;
+		span.className = 'heart' + (alive ? '' : ' empty');
+		span.textContent = '♥';
+		heartsEl.appendChild(span);
+		heartsStr += alive ? '♥' : '♡';
+	}
+	if (mPointsEl) mPointsEl.textContent = points;
+	if (mLivesEl) mLivesEl.textContent = heartsStr || '—';
+	if (livesSubEl) {
+		if (lives >= maxLives) {
+			livesSubEl.textContent = 'Max lives';
+		} else {
+			const need = nextExtraLifeAt - points;
+			livesSubEl.textContent = need > 0
+				? `+1 life at ${nextExtraLifeAt.toLocaleString()} pts (${need.toLocaleString()} to go)`
+				: 'Extra life ready';
+		}
+	}
+}
+
+function updateHint() {
+	if (!piece || piece.def.special === 'gopher') {
+		if (piece?.def.special === 'gopher') {
+			if (canPlaceGopher(piece.cells, piece.px, piece.py)) {
+				hintPanel.innerHTML = '<span class="good">Gopher ready — place to clear incomplete pipes.</span>';
+			} else if (canFloat(piece.cells, piece.px, piece.py)) {
+				hintPanel.innerHTML = '<span class="warn">Move gopher onto existing pipes, then place.</span>';
+			} else {
+				hintPanel.innerHTML = '<span class="warn">Gopher must stay on the board.</span>';
+			}
+		} else {
+			hintPanel.textContent = TIPS[tipIndex % TIPS.length];
+		}
+		return;
+	}
+	const placeOk = canPlace(piece.cells, piece.px, piece.py);
+	const closes = placeOk && wouldCompleteLoop(piece.cells, piece.px, piece.py);
+	if (closes) {
+		hintPanel.innerHTML = '<span class="good">This placement completes a loop!</span>';
+	} else if (!canFloat(piece.cells, piece.px, piece.py)) {
+		hintPanel.innerHTML = '<span class="warn">Off board — move back onto the grid.</span>';
+	} else if (!placeOk) {
+		hintPanel.innerHTML = '<span class="warn">Overlapping pipes — move to empty tiles before placing.</span>';
+	} else {
+		hintPanel.textContent = TIPS[tipIndex % TIPS.length];
+	}
+}
+
+// ─── MAIN LOOP ──────────────────────────────────────────────────────────────────
+let lastTime = 0;
+
+function tick(now) {
+	const dt = Math.min(now - lastTime, 50);
+	lastTime = now;
+	if (gameState === State.PLAYING && piece) {
+		timerLeft -= dt;
+		if (timerLeft <= 0) {
+			if (piece.def.special === 'gopher') { piece = null; spawnPiece(true); }
+			else loseLife();
+		}
+	}
+	updateParticles(dt);
+	handleInput();
+	updateGhostOrientation();
+	updateHUD();
+	updateCamera();
+	if (loopFlashTimer > 0) {
+		loopFlashTimer--;
+		if (loopFlashTimer === 0) {
+			loopFlashCells = new Set();
+			updateScene({ board: true, ghost: false });
+		}
+	}
+	if (flashTimer > 0) { flashTimer--; if (flashTimer <= 0) flashMsg.classList.remove('show'); }
+	prevKeys = { ...keys };
+	if (glReady && renderer) renderer.render(scene, camera);
+	requestAnimationFrame(tick);
+}
+
+document.addEventListener('visibilitychange', () => {
+	if (document.visibilityState === 'hidden' && gameState === State.PLAYING) pauseGame();
+	else if (document.visibilityState === 'visible') updateScene();
+});
+
+if (startBtn) startBtn.addEventListener('click', () => { ensureAudio(); startGame(); });
+if (resumeBtn) resumeBtn.addEventListener('click', resumeGame);
+if (quitBtn) quitBtn.addEventListener('click', quitToTitle);
+if (retryBtn) retryBtn.addEventListener('click', () => { ensureAudio(); gameOverOverlay.style.display = 'none'; startGame(); });
+if (levelDown) levelDown.addEventListener('click', () => cycleLevel(-1));
+if (levelUp) levelUp.addEventListener('click', () => cycleLevel(1));
+if (btnRotate) btnRotate.addEventListener('click', () => { rotatePiece(1); updateScene(); });
+if (btnPlace) btnPlace.addEventListener('click', () => { placePiece(); updateScene(); });
+if (btnSkip) btnSkip.addEventListener('click', () => { skipPiece(); updateScene(); });
+if (btnPause) btnPause.addEventListener('click', togglePause);
+
+document.addEventListener('keydown', (e) => {
+	const k = e.key;
+	if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','z','x','Z','X','q','Q','e','E','f','F','g','G','t','T','h','H','p','P','s','S','Escape','c','C'].includes(k)) e.preventDefault();
+	keys[k] = true;
+	if (gameState === State.TITLE) {
+		if (k === 'Enter' || k === ' ') { ensureAudio(); startGame(); return; }
+		if (k === 'ArrowLeft') cycleLevel(-1);
+		if (k === 'ArrowRight') cycleLevel(1);
+		if (k === 'ArrowUp' || k === 'ArrowDown') cycleDifficulty(k === 'ArrowUp' ? 1 : -1);
+		return;
+	}
+	handleInput();
+});
+document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+const _placePiece = placePiece;
+placePiece = function() { const r = _placePiece(); updateScene(); return r; };
+const _movePiece = movePiece;
+movePiece = function(dx, dy) { const r = _movePiece(dx, dy); updateScene({ board: false, ghost: true }); refreshGhostMaterial(); return r; };
+const _rotatePiece = rotatePiece;
+rotatePiece = function(dir) { const r = _rotatePiece(dir); updateScene(); return r; };
+const _tiltPiece = tiltPiece;
+tiltPiece = function(axis, dir) { const r = _tiltPiece(axis, dir); updateGhostOrientation(); return r; };
+const _skipPiece = skipPiece;
+skipPiece = function() { const r = _skipPiece(); updateScene(); return r; };
+const _spawnPiece = spawnPiece;
+spawnPiece = function(fromQueue) { const r = _spawnPiece(fromQueue); updateScene(); return r; };
+const _startGame = startGame;
+startGame = function() { _startGame(); updateScene(); };
+const _loseLife = loseLife;
+loseLife = function() { _loseLife(); updateScene(); };
+const _quitToTitle = quitToTitle;
+quitToTitle = function() { _quitToTitle(); updateScene(); };
+
+function stopMusic() {}
+function stopTouchRepeat() {}
+
+function showToast(msg, ms = 2800) {
+	if (!flashMsg) return;
+	flashMsg.textContent = msg;
+	flashMsg.classList.add('show');
+	flashTimer = ms;
+}
+
+function onGamepadConnected(gp) {
+	gpSlot = gp.index;
+	gpConnectedName = (gp.id || 'Controller').replace(/\s*\([^)]*\)\s*$/, '').trim() || 'Controller';
+	prevGpSnap = null;
+	updateGpIndicator(true);
+	showToast(`${gpConnectedName} ready — Start or A to play`, 2800);
+}
+
+window.addEventListener('gamepadconnected', (e) => {
+	ensureAudio();
+	onGamepadConnected(e.gamepad);
+});
+window.addEventListener('gamepaddisconnected', (e) => {
+	if (e.gamepad.index === gpSlot) {
+		gpSlot = null;
+		gpConnectedName = '';
+	}
+	prevGpSnap = null;
+	prevGpRt = 0;
+	prevGpLt = 0;
+	gpDasKey = null;
+	gpDasTimer = 0;
+	updateGpIndicator(getActiveGamepad() !== null);
+});
+['pointerdown', 'keydown', 'touchstart'].forEach((ev) => {
+	document.addEventListener(ev, () => pollGamepads(), { passive: true });
+});
+(function scanGamepadsOnLoad() {
+	pollGamepads();
+	const pads = navigator.getGamepads?.();
+	if (!pads) return;
+	for (const gp of pads) {
+		if (gp?.connected) {
+			onGamepadConnected(gp);
+			break;
+		}
+	}
+})();
+
+init3d();
+
+</script>
+</body>
+</html>

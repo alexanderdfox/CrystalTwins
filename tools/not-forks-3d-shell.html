@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<!-- Not Forks 3D: COLS=14, ROWS=9, 26 pipe pieces + gopher. Hollow pipe rendering via Three.js -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120818">
+<title>Not Forks 3D</title>
+<link rel="icon" href="not-forks-3d-favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="not-forks-3d-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #08040f; font-family: 'Exo 2', system-ui, sans-serif; color: #ece4ff; }
+#app { display: flex; height: 100%; min-height: 0; }
+#viewport { flex: 1; position: relative; min-width: 0; overflow: hidden; }
+#viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#viewport canvas.dragging { cursor: grabbing; }
+#hud { width: 168px; flex-shrink: 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
+  background: linear-gradient(155deg, rgba(64,40,88,0.97), rgba(18,8,24,0.99)); border-left: 1px solid rgba(160,120,200,0.35); }
+.panel { padding: 10px 12px; background: rgba(16,10,28,0.72); border: 1px solid rgba(100,80,140,0.35); border-radius: 10px; }
+.panel label { display: block; font-size: 9px; font-weight: 600; letter-spacing: 1.8px; color: #9070b8; text-transform: uppercase; margin-bottom: 4px; }
+.panel .val { font-size: 22px; font-weight: 700; color: #f4eeff; }
+.panel .sub { font-size: 10px; color: #9888b0; margin-top: 3px; }
+.timer-bar { height: 10px; background: #140c20; border: 1px solid #504070; border-radius: 5px; margin-top: 6px; overflow: hidden; }
+.timer-fill { height: 100%; background: linear-gradient(90deg, #30a888, #70f0c8); transition: width 0.08s linear; }
+.timer-fill.low { background: linear-gradient(90deg, #c04060, #ff8098); }
+.hearts { display: flex; gap: 4px; font-size: 18px; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { flex: 1; min-width: 60px; padding: 8px; border: 1px solid #604880; border-radius: 6px; background: linear-gradient(180deg, #382050, #281838); color: #e8d8ff; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn.primary { background: linear-gradient(180deg, #308868, #206848); border-color: #50c898; }
+.btn.gold { background: linear-gradient(180deg, #806020, #604010); border-color: #c0a040; }
+.picker { display: flex; align-items: center; gap: 8px; }
+.picker-btn { width: 32px; height: 32px; border: 1px solid #604880; border-radius: 6px; background: #281838; color: #d0b8f0; cursor: pointer; font-family: inherit; }
+.picker-val { font-size: 12px; font-weight: 600; color: #70f0c8; flex: 1; text-align: center; }
+#next3d { width: 88px; height: 88px; display: block; margin: 6px auto 0; border-radius: 8px; background: #0a0612; }
+.overlay { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(40,24,64,0.9), rgba(6,3,12,0.94)); backdrop-filter: blur(8px); }
+.overlay h1 { font-family: Orbitron, 'Exo 2', sans-serif; font-size: clamp(20px,4vw,28px); letter-spacing: 4px;
+  background: linear-gradient(135deg, #fff0a0, #ffc840, #f08030); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.overlay h2 { font-size: 22px; color: #a890d0; margin-bottom: 8px; }
+.overlay p { font-size: 11px; color: #8878a8; max-width: 280px; line-height: 1.5; }
+.start-btn { margin-top: 12px; padding: 10px 28px; font-weight: 700; letter-spacing: 2px; border: none; border-radius: 8px;
+  background: linear-gradient(180deg, #40b888, #288868); color: #fff; cursor: pointer; font-family: inherit; }
+.flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%); font-family: Orbitron, 'Exo 2', sans-serif;
+  font-size: 18px; font-weight: 700; color: #ffe060; text-shadow: 0 0 20px rgba(255,220,80,0.9); pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 15; }
+.flash-msg.show { opacity: 1; }
+.gp-indicator {
+  position: absolute; top: 10px; right: 10px; z-index: 12;
+  display: none; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  color: #70f0c8; padding: 6px 10px;
+  background: rgba(16, 10, 28, 0.88); border: 1px solid rgba(80, 200, 168, 0.4);
+  border-radius: 8px; pointer-events: none;
+}
+.gp-indicator.show { display: flex; }
+#touchBar { display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: 8px; background: rgba(12,6,18,0.95); border-top: 1px solid #504070; z-index: 30; }
+#touchBar .touch-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.touch-btn { min-width: 48px; min-height: 48px; border: 2px solid #604880; border-radius: 10px; background: #281838; color: #e8d8ff; font-size: 16px; font-family: inherit; }
+.touch-btn.place { background: #206848; border-color: #50c898; font-size: 12px; }
+.status-bar strong { color: #60e8c8; }
+.hint-panel .good { color: #60e8c8; }
+.hint-panel .warn { color: #f0c060; }
+@media (max-width: 900px) { #hud { display: none; } #touchBar { display: block; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <span class="gp-indicator" id="gpIndicator" title="Gamepad">🎮</span>
+    <div class="flash-msg" id="flashMsg"></div>
+    <div class="overlay" id="titleOverlay" style="display:flex">
+      <h1>NOT FORKS 3D</h1>
+      <p>Grid snap · Z/X rotate · 15° tilt steps · gamepad supported</p>
+      <p style="margin-top:8px">Best: <span id="titleBest">0</span></p>
+      <button type="button" class="start-btn" id="startBtn">START</button>
+    </div>
+    <div class="overlay" id="pauseOverlay">
+      <h2>PAUSED</h2>
+      <p>P or Esc to resume</p>
+      <button type="button" class="start-btn" id="resumeBtn">RESUME</button>
+      <button type="button" class="btn" id="quitBtn" style="margin-top:8px">QUIT</button>
+    </div>
+    <div class="overlay" id="gameOverOverlay">
+      <h2>GAME OVER</h2>
+      <p id="gameOverText"></p>
+      <button type="button" class="start-btn" id="retryBtn">TRY AGAIN</button>
+    </div>
+  </div>
+  <aside id="hud">
+    <div class="panel"><label>Score</label><div class="val" id="points">0</div><div class="sub">Best: <span id="bestScore">0</span></div></div>
+    <div class="panel"><label>Loops</label><div class="val" id="loopCount">0</div><div class="sub" id="streakLabel">No streak</div></div>
+    <div class="panel"><label>Lives</label><div class="hearts" id="heartsEl"></div><div class="sub" id="livesSub"></div></div>
+    <div class="panel"><label>Timer</label><div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div><div class="sub" id="timerSec">—</div></div>
+    <div class="panel"><label>Next</label><canvas id="next3d" width="88" height="88"></canvas></div>
+    <div class="panel picker">
+      <button type="button" class="picker-btn" id="levelDown">−</button>
+      <span class="picker-val" id="levelLabel">Relaxed · Lv 0</span>
+      <button type="button" class="picker-btn" id="levelUp">+</button>
+    </div>
+    <div class="panel btn-row">
+      <button type="button" class="btn" id="btnRotate">Rotate</button>
+      <button type="button" class="btn primary" id="btnPlace">Place</button>
+    </div>
+    <div class="panel btn-row">
+      <button type="button" class="btn gold" id="btnSkip">Skip</button>
+      <button type="button" class="btn" id="btnPause">Pause</button>
+    </div>
+    <div class="panel status-bar" id="statusBar">Grid move · Space/A place · Z/X grid rotate · Q/E F/G T/H 15° tilt</div>
+    <div class="panel hint-panel" id="hintPanel"></div>
+  </aside>
+</div>
+<div id="touchBar">
+  <div class="touch-row">
+    <button type="button" class="touch-btn" data-act="up">▲</button>
+    <button type="button" class="touch-btn" data-act="left">◀</button>
+    <button type="button" class="touch-btn" data-act="down">▼</button>
+    <button type="button" class="touch-btn" data-act="right">▶</button>
+    <button type="button" class="touch-btn" data-act="rotate-ccw">⟲</button>
+    <button type="button" class="touch-btn" data-act="rotate">⟳</button>
+    <button type="button" class="touch-btn place" data-act="place">PLACE</button>
+    <button type="button" class="touch-btn" data-act="pause">⏸</button>
+  </div>
+  <div class="touch-row">
+    <button type="button" class="touch-btn" data-act="yaw-left" title="Yaw left">↶Y</button>
+    <button type="button" class="touch-btn" data-act="yaw-right" title="Yaw right">Y↷</button>
+    <button type="button" class="touch-btn" data-act="pitch-up" title="Pitch up">F↑</button>
+    <button type="button" class="touch-btn" data-act="pitch-down" title="Pitch down">F↓</button>
+    <button type="button" class="touch-btn" data-act="roll-left" title="Roll left">T↺</button>
+    <button type="button" class="touch-btn" data-act="roll-right" title="Roll right">T↻</button>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+__LOGIC_PRE__
+__THREE__
+__LOGIC_POST__
+</script>
+</body>
+</html>
