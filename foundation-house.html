@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14100c">
+<title>Foundation House</title>
+<link rel="icon" href="foundation-house-favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="foundation-house-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+	height: 100%;
+	overflow: hidden;
+	background: #0e0c0a;
+	color: #ebe4d8;
+	font-family: 'Exo 2', system-ui, sans-serif;
+}
+#app {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	max-width: 980px;
+	margin: 0 auto;
+}
+header {
+	padding: 10px 14px;
+	border-bottom: 1px solid rgba(180, 150, 100, 0.25);
+	background: linear-gradient(180deg, #1e1814, #12100e);
+	flex-shrink: 0;
+}
+header h1 {
+	font-family: 'Crimson Pro', Georgia, serif;
+	font-size: clamp(18px, 4vw, 24px);
+	font-weight: 600;
+	color: #e8d4a8;
+}
+header .tagline { font-size: 11px; color: #8a7a68; margin-top: 2px; }
+#hud {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	padding: 8px 14px;
+	font-size: 11px;
+	background: rgba(20, 16, 12, 0.92);
+	border-bottom: 1px solid rgba(120, 100, 70, 0.2);
+	flex-shrink: 0;
+}
+#hud .stat strong { color: #d4b878; }
+#mapWrap { flex: 1; position: relative; min-height: 0; background: #0a0908; }
+#map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#map.dragging { cursor: grabbing; }
+#panel {
+	flex-shrink: 0;
+	padding: 12px 14px max(12px, env(safe-area-inset-bottom));
+	background: linear-gradient(0deg, #1a1612, #12100e);
+	border-top: 1px solid rgba(180, 150, 100, 0.3);
+	max-height: 42vh;
+	overflow-y: auto;
+}
+#roomTitle {
+	font-family: 'Crimson Pro', Georgia, serif;
+	font-size: 17px;
+	color: #f0e0c0;
+	margin-bottom: 2px;
+}
+#roomCite {
+	font-size: 11px;
+	color: #c9a227;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+#roomCite a, #nextSteps a, #breadcrumb a, #hoverTip a, #roomSource a {
+	color: #e0c878;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+#roomCite a:hover, #nextSteps a:hover, #breadcrumb a:hover, #hoverTip a:hover, #roomSource a:hover {
+	color: #fff0d0;
+}
+#roomSource {
+	font-size: 10px;
+	margin-bottom: 6px;
+}
+#roomSource a { font-weight: 600; }
+#roomEra {
+	font-size: 10px;
+	color: #7a6a58;
+	text-transform: uppercase;
+	letter-spacing: 1.2px;
+	margin-bottom: 8px;
+}
+#roomQuote {
+	font-family: 'Crimson Pro', Georgia, serif;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #d8c8a8;
+	border-left: 3px solid rgba(201, 162, 39, 0.5);
+	padding: 6px 0 6px 10px;
+	margin-bottom: 8px;
+}
+#roomTrace {
+	font-size: 12px;
+	line-height: 1.55;
+	color: #a89880;
+}
+#nextSteps {
+	margin-top: 10px;
+	font-size: 11px;
+	color: #6a9a78;
+}
+#nextSteps ul { margin: 6px 0 0 16px; padding: 0; }
+#nextSteps li { margin-bottom: 4px; }
+#breadcrumb {
+	font-size: 10px;
+	color: #6a5a48;
+	margin-top: 10px;
+	line-height: 1.45;
+}
+#hint { font-size: 11px; color: #5a7a8a; margin-top: 8px; }
+.overlay {
+	position: absolute; inset: 0; z-index: 10;
+	display: flex; flex-direction: column; align-items: center; justify-content: center;
+	text-align: center; padding: 20px;
+	background: rgba(8, 6, 4, 0.94);
+	backdrop-filter: blur(6px);
+	overflow-y: auto;
+}
+.overlay.hidden { display: none; }
+.overlay h2 {
+	font-family: 'Crimson Pro', Georgia, serif;
+	font-size: clamp(20px, 4vw, 26px);
+	color: #e8d4a8;
+	margin-bottom: 10px;
+}
+.overlay .epigraph {
+	font-family: 'Crimson Pro', Georgia, serif;
+	font-size: clamp(13px, 3vw, 16px);
+	line-height: 1.65;
+	color: #a89880;
+	max-width: 480px;
+	margin-bottom: 14px;
+}
+.overlay .note {
+	font-size: 11px;
+	color: #6a5a48;
+	max-width: 440px;
+	line-height: 1.5;
+	margin-bottom: 14px;
+	text-align: left;
+}
+.overlay p.controls {
+	font-size: 11px;
+	color: #7a6a58;
+	max-width: 400px;
+	line-height: 1.5;
+	margin-bottom: 14px;
+}
+.btn {
+	padding: 10px 24px;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	border: 1px solid #8a7048;
+	border-radius: 6px;
+	background: linear-gradient(180deg, #4a3a28, #2a2218);
+	color: #f0e0c0;
+	cursor: pointer;
+}
+.btn:hover { border-color: #c9a227; }
+.flash {
+	position: absolute; top: 42%; left: 50%;
+	transform: translate(-50%, -50%);
+	font-family: 'Crimson Pro', serif;
+	font-size: 18px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.15s;
+	z-index: 5;
+	text-align: center;
+	max-width: 90%;
+}
+.flash.show { opacity: 1; }
+#legend {
+	font-size: 10px;
+	color: #6a5a48;
+	padding: 4px 14px 0;
+	line-height: 1.5;
+	flex-shrink: 0;
+}
+#legend span { margin-right: 10px; }
+#legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+#hoverTip {
+	position: absolute;
+	pointer-events: none;
+	z-index: 4;
+	padding: 6px 8px;
+	font-size: 10px;
+	background: rgba(20, 16, 12, 0.95);
+	border: 1px solid #6a5a48;
+	border-radius: 4px;
+	max-width: 200px;
+	display: none;
+	color: #e8dcc8;
+}
+</style>
+</head>
+<body>
+<div id="app">
+	<header>
+		<h1>Foundation House</h1>
+		<p class="tagline">Trace real law-rooms back to the U.S. Constitution</p>
+	</header>
+	<div id="legend" aria-hidden="true">
+		<span><i class="dot" style="background:#c9a227"></i>Constitution</span>
+		<span><i class="dot" style="background:#90b0d0"></i>Rights</span>
+		<span><i class="dot" style="background:#70a878"></i>Labor</span>
+		<span><i class="dot" style="background:#a080c0"></i>Econ</span>
+		<span><i class="dot" style="background:#60a888"></i>Env</span>
+		<span><i class="dot" style="background:#c09060"></i>Security</span>
+		<span>Drag map to pan · 1–9 pick hall</span>
+	</div>
+	<div id="hud">
+		<span class="stat">Traced: <strong id="scoreEl">0</strong></span>
+		<span class="stat">Streak: <strong id="streakEl">0</strong></span>
+		<span class="stat">Lives: <strong id="livesEl">3</strong></span>
+		<span class="stat">Steps to Stone: <strong id="depthEl">—</strong></span>
+		<span class="stat">Best: <strong id="bestEl">0</strong></span>
+		<span class="stat" id="lawCount"></span>
+	</div>
+	<div id="mapWrap">
+		<canvas id="map"></canvas>
+		<div id="hoverTip"></div>
+		<div class="flash" id="flash"></div>
+		<div class="overlay" id="titleOverlay">
+			<h2>Foundation House</h2>
+			<p class="epigraph">A free people built a great House upon one strong Foundation Stone called the Constitution, then added so many rooms of laws over the centuries that the House became vast and bewildering. No person knows all the rooms, yet every room claims its authority by tracing back, however distantly, to that single Foundation Stone.</p>
+			<p class="note">This game maps the <strong>full United States Code</strong> (all 54 titles) plus landmark statutes, CFR rules, and executive actions—each with real citations and <strong>links</strong> to the U.S. Code, Constitution, CFR, and Congress.gov. Green halls are documented steps <em>toward</em> the Constitution.</p>
+			<p class="controls">You begin in a distant regulation or statute. Click only neighboring halls that lie one step closer to the Constitution. Read the citations as you climb back.</p>
+			<button type="button" class="btn" id="startBtn">Enter the House</button>
+		</div>
+		<div class="overlay hidden" id="gameOverOverlay">
+			<h2 id="goTitle">Game Over</h2>
+			<p class="epigraph" id="goText"></p>
+			<button type="button" class="btn" id="retryBtn">Try Again</button>
+		</div>
+	</div>
+	<div id="panel">
+		<div id="roomTitle">—</div>
+		<div id="roomCite"></div>
+		<div id="roomSource"></div>
+		<div id="roomEra"></div>
+		<blockquote id="roomQuote"></blockquote>
+		<p id="roomTrace"></p>
+		<div id="nextSteps"></div>
+		<div id="breadcrumb"></div>
+		<p id="hint"></p>
+	</div>
+</div>
+<script src="foundation-house-links.js"></script>
+<script src="foundation-house-titles.js"></script>
+<script src="foundation-house-laws.js"></script>
+<script>
+'use strict';
+
+/* ROOMS loaded from foundation-house-laws.js */
+
+const DOMAIN_COLORS = {
+	foundation: '#c9a227',
+	structural: '#b0a080',
+	power: '#908070',
+	rights: '#90b0d0',
+	labor: '#70a878',
+	econ: '#a080c0',
+	env: '#60a888',
+	health: '#80b8a0',
+	comm: '#7090c8',
+	security: '#c09060',
+	transport: '#8898a8',
+	energy: '#b0a060',
+	education: '#88a0b8',
+	consumer: '#a89078',
+	general: '#5a5048',
+};
+
+let viewPanX = 0;
+let viewPanY = 0;
+let viewZoom = 1;
+let viewInit = false;
+let mapDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let panStartX = 0;
+let panStartY = 0;
+let dragMoved = false;
+
+function screenToWorld(sx, sy) {
+	return { x: (sx - viewPanX) / viewZoom, y: (sy - viewPanY) / viewZoom };
+}
+
+function nodeRadius(n) {
+	if (n.depth === 0) return 18;
+	if (n.id === currentId) return 14;
+	return Math.max(5, 10 - Math.floor(nodes.size / 22));
+}
+
+const nodes = new Map();
+const edges = [];
+let maxDepth = 0;
+
+function buildGraph() {
+	for (const room of ROOMS) {
+		nodes.set(room.id, { ...room, depth: room.layer, x: 0, y: 0 });
+		if (room.layer > maxDepth) maxDepth = room.layer;
+	}
+	for (const room of ROOMS) {
+		for (const pid of room.parents) {
+			edges.push([room.id, pid]);
+		}
+	}
+}
+
+/** Edges run child → parent (toward the Constitution). */
+function lawfulStepsFrom(id) {
+	return edges
+		.filter(([from, to]) => from === id)
+		.map(([, to]) => to);
+}
+
+function stepsToFoundation(id) {
+	if (id === 'constitution') return 0;
+	const seen = new Set();
+	const q = [[id, 0]];
+	while (q.length) {
+		const [cur, d] = q.shift();
+		if (cur === 'constitution') return d;
+		if (seen.has(cur)) continue;
+		seen.add(cur);
+		for (const p of lawfulStepsFrom(cur)) {
+			if (!seen.has(p)) q.push([p, d + 1]);
+		}
+	}
+	return 99;
+}
+
+function layoutNodes(w, h) {
+	const cx = w / 2;
+	const cy = h / 2;
+	const base = Math.min(w, h);
+	const layerLabels = [
+		'Constitution',
+		'Articles & Amendments',
+		'Powers, U.S.C. & C.F.R.',
+		'U.S.C. Titles (1–54)',
+		'Landmark Statutes',
+		'CFR & Executive Actions',
+	];
+	for (let d = 0; d <= maxDepth; d++) {
+		const layer = [...nodes.values()].filter(n => n.depth === d).sort((a, b) => a.id.localeCompare(b.id));
+		const rings = layer.length > 12 ? (layer.length > 28 ? 3 : 2) : 1;
+		const outerR = d === 0 ? 0 : base * (0.36 + (d / maxDepth) * 0.22);
+		layer.forEach((n, i) => {
+			const ring = rings > 1 ? i % rings : 0;
+			const idxInRing = rings > 1 ? Math.floor(i / rings) : i;
+			const countRing = rings > 1 ? Math.ceil(layer.length / rings) : layer.length;
+			const r = outerR * (0.88 + ring * 0.09);
+			const angle = (idxInRing / countRing) * Math.PI * 2 - Math.PI / 2 + d * 0.05;
+			n.x = cx + Math.cos(angle) * r;
+			n.y = cy + Math.sin(angle) * r * 0.76;
+			n.layerLabel = layerLabels[d] || '';
+		});
+	}
+	const foundation = nodes.get('constitution');
+	if (foundation) {
+		foundation.x = cx;
+		foundation.y = cy + base * 0.04;
+	}
+}
+
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const hoverTip = document.getElementById('hoverTip');
+const scoreEl = document.getElementById('scoreEl');
+const streakEl = document.getElementById('streakEl');
+const livesEl = document.getElementById('livesEl');
+const depthEl = document.getElementById('depthEl');
+const bestEl = document.getElementById('bestEl');
+const lawCountEl = document.getElementById('lawCount');
+const roomTitle = document.getElementById('roomTitle');
+const roomCite = document.getElementById('roomCite');
+const roomSource = document.getElementById('roomSource');
+const roomEra = document.getElementById('roomEra');
+const roomQuote = document.getElementById('roomQuote');
+const roomTrace = document.getElementById('roomTrace');
+const nextStepsEl = document.getElementById('nextSteps');
+const breadcrumb = document.getElementById('breadcrumb');
+const hintEl = document.getElementById('hint');
+const flash = document.getElementById('flash');
+const titleOverlay = document.getElementById('titleOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+let state = 'title';
+let currentId = null;
+let path = [];
+let score = 0;
+let streak = 0;
+let lives = 3;
+let best = 0;
+let validNext = [];
+let pulse = 0;
+let hoverId = null;
+
+try {
+	best = parseInt(localStorage.getItem('foundationHouse_best') || '0', 10) || 0;
+} catch {}
+bestEl.textContent = best;
+
+function saveBest() {
+	if (score > best) {
+		best = score;
+		try { localStorage.setItem('foundationHouse_best', String(best)); } catch {}
+		bestEl.textContent = best;
+	}
+}
+
+function resize() {
+	const wrap = document.getElementById('mapWrap');
+	const dpr = Math.min(devicePixelRatio || 1, 2);
+	canvas.width = wrap.clientWidth * dpr;
+	canvas.height = wrap.clientHeight * dpr;
+	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	layoutNodes(wrap.clientWidth, wrap.clientHeight);
+	if (!viewInit) {
+		viewZoom = nodes.size > 120 ? 0.52 : nodes.size > 80 ? 0.62 : nodes.size > 55 ? 0.72 : 1;
+		viewInit = true;
+	}
+	draw();
+}
+
+function pickStartRoom() {
+	const starters = [...nodes.values()].filter(n => n.depth >= 3);
+	return starters[Math.floor(Math.random() * starters.length)].id;
+}
+
+function updatePanel() {
+	const n = nodes.get(currentId);
+	if (!n) return;
+	const url = lawUrl(n);
+	roomTitle.textContent = n.name;
+	setLinkedText(roomCite, n.cite, url);
+	if (url) {
+		roomSource.innerHTML = citeLinkHtml('Read full text ↗', url);
+	} else {
+		roomSource.textContent = '';
+	}
+	roomEra.textContent = n.layerLabel || (n.depth === 0 ? 'Foundation' : `${n.era} · ${n.depth} step${stepsToFoundation(n.id) === 1 ? '' : 's'} to Stone`);
+	roomQuote.textContent = n.quote;
+	roomTrace.textContent = n.trace;
+	const steps = stepsToFoundation(n.id);
+	depthEl.textContent = n.depth === 0 ? '0' : String(steps);
+
+	if (validNext.length) {
+		const items = validNext.map(id => {
+			const p = nodes.get(id);
+			const pUrl = lawUrl(p);
+			const citeHtml = citeLinkHtml(p.cite, pUrl);
+			return `<li><strong>${escapeHtml(p.name)}</strong> <span style="color:#8a7a68">${citeHtml}</span></li>`;
+		}).join('');
+		nextStepsEl.innerHTML = `<strong>Lawful next halls toward the Stone:</strong><ul>${items}</ul>`;
+	} else if (n.depth > 0) {
+		nextStepsEl.innerHTML = '<strong>No documented step</strong> from this room in the map.';
+	} else {
+		nextStepsEl.innerHTML = '';
+	}
+
+	const crumbs = path.map(id => {
+		const r = nodes.get(id);
+		return citeLinkHtml(r.cite, lawUrl(r));
+	}).join(' → ');
+	breadcrumb.innerHTML = 'Path: ' + crumbs;
+
+	if (n.depth === 0) {
+		hintEl.textContent = 'You reached the Constitution. Another distant room awaits…';
+	} else if (validNext.length) {
+		const keyHint = validNext.length > 9 ? ' Keys 1–9 pick the first nine halls.' : ' Press 1–9 to pick (see list).';
+		hintEl.textContent = 'Green nodes are documented upstream sources. Click one, or drag the map.' + keyHint;
+	} else {
+		hintEl.textContent = 'This room has no mapped upstream hall—restart the trace.';
+	}
+}
+
+function showFlash(text, color = '#80c090') {
+	flash.textContent = text;
+	flash.style.color = color;
+	flash.classList.add('show');
+	setTimeout(() => flash.classList.remove('show'), 1100);
+}
+
+function startRun() {
+	score = 0;
+	streak = 0;
+	lives = 3;
+	scoreEl.textContent = '0';
+	streakEl.textContent = '0';
+	livesEl.textContent = '3';
+	state = 'playing';
+	titleOverlay.classList.add('hidden');
+	gameOverOverlay.classList.add('hidden');
+	spawnChallenge();
+}
+
+function spawnChallenge() {
+	if (state !== 'playing') return;
+	currentId = pickStartRoom();
+	path = [currentId];
+	validNext = lawfulStepsFrom(currentId);
+	updatePanel();
+	draw();
+}
+
+function reachFoundation() {
+	score++;
+	streak++;
+	scoreEl.textContent = score;
+	streakEl.textContent = streak;
+	saveBest();
+	showFlash(`Traced to the Constitution! (+${streak} streak)`, '#c9a227');
+	setTimeout(spawnChallenge, 1400);
+}
+
+function moveTo(id) {
+	const n = nodes.get(id);
+	const cur = nodes.get(currentId);
+	if (!n || !cur) return;
+
+	if (validNext.includes(id)) {
+		currentId = id;
+		path.push(id);
+		if (n.depth === 0) {
+			updatePanel();
+			draw();
+			reachFoundation();
+			return;
+		}
+		validNext = lawfulStepsFrom(currentId);
+		updatePanel();
+		draw();
+		return;
+	}
+
+	if (n.depth >= cur.depth) {
+		lives--;
+		streak = 0;
+		livesEl.textContent = lives;
+		streakEl.textContent = '0';
+		showFlash('That source is not a documented step toward the Constitution', '#c07060');
+		if (lives <= 0) {
+			state = 'over';
+			document.getElementById('goTitle').textContent = 'Lost in the House';
+			document.getElementById('goText').textContent =
+				`You completed ${score} trace${score === 1 ? '' : 's'} to the Constitution. Each green hall is a real citation—statute, amendment, or rule claiming authority upstream.`;
+			gameOverOverlay.classList.remove('hidden');
+		}
+	}
+}
+
+function hitTest(mx, my) {
+	const { x, y } = screenToWorld(mx, my);
+	let best = null;
+	let bestD = 28;
+	for (const n of nodes.values()) {
+		const r = nodeRadius(n);
+		const d = Math.hypot(n.x - x, n.y - y);
+		if (d < bestD + r * 0.45) {
+			bestD = d;
+			best = n.id;
+		}
+	}
+	return best;
+}
+
+function draw() {
+	const w = canvas.width / (Math.min(devicePixelRatio || 1, 2));
+	const h = canvas.height / (Math.min(devicePixelRatio || 1, 2));
+	ctx.clearRect(0, 0, w, h);
+
+	const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.55);
+	g.addColorStop(0, '#221c16');
+	g.addColorStop(1, '#080604');
+	ctx.fillStyle = g;
+	ctx.fillRect(0, 0, w, h);
+
+	ctx.save();
+	ctx.translate(viewPanX, viewPanY);
+	ctx.scale(viewZoom, viewZoom);
+
+	const base = Math.min(w, h);
+	for (let d = 1; d <= maxDepth; d++) {
+		const layer = [...nodes.values()].filter(n => n.depth === d);
+		if (!layer.length) continue;
+		const r = base * (0.36 + (d / maxDepth) * 0.22);
+		ctx.strokeStyle = 'rgba(80, 60, 40, 0.1)';
+		ctx.lineWidth = 1 / viewZoom;
+		ctx.beginPath();
+		ctx.ellipse(w / 2, h / 2, r, r * 0.76, 0, 0, Math.PI * 2);
+		ctx.stroke();
+	}
+
+	for (const [from, to] of edges) {
+		const a = nodes.get(from);
+		const b = nodes.get(to);
+		const onPath = path.includes(from) && path.includes(to) &&
+			path.indexOf(from) + 1 === path.indexOf(to);
+		const isValid = validNext.includes(to) && from === currentId;
+		ctx.beginPath();
+		ctx.moveTo(a.x, a.y);
+		ctx.lineTo(b.x, b.y);
+		ctx.strokeStyle = onPath ? 'rgba(201, 162, 39, 0.7)' :
+			isValid ? 'rgba(100, 180, 120, 0.55)' : 'rgba(70, 55, 40, 0.2)';
+		ctx.lineWidth = onPath ? 2 : isValid ? 1.5 : 0.8;
+		ctx.stroke();
+	}
+
+	pulse += 0.035;
+	const glow = 0.5 + Math.sin(pulse) * 0.18;
+
+	for (const n of nodes.values()) {
+		const isCurrent = n.id === currentId;
+		const isValid = validNext.includes(n.id);
+		const isFoundation = n.depth === 0;
+		const onPath = path.includes(n.id);
+		const r = nodeRadius(n);
+		const domainColor = DOMAIN_COLORS[n.domain] || DOMAIN_COLORS.general;
+
+		if (isFoundation) {
+			const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 2.2);
+			grd.addColorStop(0, `rgba(220, 180, 80, ${0.55 * glow})`);
+			grd.addColorStop(1, 'rgba(120, 90, 40, 0)');
+			ctx.fillStyle = grd;
+			ctx.beginPath();
+			ctx.arc(n.x, n.y, r * 2.2, 0, Math.PI * 2);
+			ctx.fill();
+		}
+
+		ctx.beginPath();
+		ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+		if (isFoundation) ctx.fillStyle = domainColor;
+		else if (isCurrent) ctx.fillStyle = '#d08050';
+		else if (isValid) ctx.fillStyle = 'rgba(90, 170, 110, 0.95)';
+		else if (onPath) ctx.fillStyle = '#5a5040';
+		else ctx.fillStyle = n.depth >= maxDepth - 1 ? domainColor : domainColor + '99';
+		ctx.fill();
+		ctx.strokeStyle = isCurrent ? '#f0e0c0' : isValid ? '#a0e0b0' : onPath ? '#8a7a58' : '#4a4030';
+		ctx.lineWidth = (isCurrent ? 2.5 : 1) / viewZoom;
+		ctx.stroke();
+
+		if (isFoundation || isCurrent || isValid) {
+			ctx.fillStyle = '#e8dcc8';
+			ctx.font = `${isFoundation ? 600 : 500} ${(isFoundation ? 8 : 7) / viewZoom}px Exo 2, sans-serif`;
+			ctx.textAlign = 'center';
+			if (isCurrent) ctx.fillText('YOU', n.x, n.y - r - 4);
+			else if (isValid) {
+				const idx = validNext.indexOf(n.id) + 1;
+				if (idx <= 9) ctx.fillText(String(idx), n.x, n.y - r - 4);
+			}
+		}
+	}
+
+	ctx.restore();
+
+	ctx.fillStyle = 'rgba(120, 100, 70, 0.55)';
+	ctx.font = '500 9px Exo 2, sans-serif';
+	ctx.textAlign = 'center';
+	const cur = nodes.get(currentId);
+	if (cur?.layerLabel) ctx.fillText(cur.layerLabel, w / 2, 14);
+}
+
+function pointer(mx, my, click) {
+	if (state !== 'playing') return;
+	if (click && dragMoved) return;
+	const id = hitTest(mx, my);
+	if (click && id) moveTo(id);
+}
+
+function showHover(id, mx, my) {
+	if (!id || state !== 'playing') {
+		hoverTip.style.display = 'none';
+		return;
+	}
+	const n = nodes.get(id);
+	hoverTip.style.display = 'block';
+	hoverTip.style.left = `${mx + 12}px`;
+	hoverTip.style.top = `${my + 8}px`;
+	const tipUrl = lawUrl(n);
+	hoverTip.innerHTML = `<strong>${escapeHtml(n.name)}</strong><br>${citeLinkHtml(n.cite, tipUrl)}`
+		+ (tipUrl ? `<br><span style="opacity:0.85">${citeLinkHtml('Read source ↗', tipUrl)}</span>` : '');
+}
+
+canvas.addEventListener('mousedown', (e) => {
+	if (e.button !== 0) return;
+	mapDragging = true;
+	dragMoved = false;
+	dragStartX = e.clientX;
+	dragStartY = e.clientY;
+	panStartX = viewPanX;
+	panStartY = viewPanY;
+	canvas.classList.add('dragging');
+});
+window.addEventListener('mousemove', (e) => {
+	if (mapDragging) {
+		if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 6) dragMoved = true;
+		viewPanX = panStartX + (e.clientX - dragStartX);
+		viewPanY = panStartY + (e.clientY - dragStartY);
+		draw();
+		return;
+	}
+	const r = canvas.getBoundingClientRect();
+	const mx = e.clientX - r.left;
+	const my = e.clientY - r.top;
+	hoverId = hitTest(mx, my);
+	showHover(hoverId, e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => {
+	mapDragging = false;
+	canvas.classList.remove('dragging');
+});
+canvas.addEventListener('click', (e) => {
+	const r = canvas.getBoundingClientRect();
+	pointer(e.clientX - r.left, e.clientY - r.top, true);
+});
+canvas.addEventListener('mouseleave', () => { hoverTip.style.display = 'none'; });
+canvas.addEventListener('wheel', (e) => {
+	e.preventDefault();
+	const r = canvas.getBoundingClientRect();
+	const mx = e.clientX - r.left;
+	const my = e.clientY - r.top;
+	const factor = e.deltaY > 0 ? 0.9 : 1.1;
+	const nz = Math.min(1.5, Math.max(0.4, viewZoom * factor));
+	viewPanX = mx - (mx - viewPanX) * (nz / viewZoom);
+	viewPanY = my - (my - viewPanY) * (nz / viewZoom);
+	viewZoom = nz;
+	draw();
+}, { passive: false });
+let touchPanStart = null;
+canvas.addEventListener('touchstart', (e) => {
+	if (e.touches.length === 1) {
+		touchPanStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: viewPanX, py: viewPanY };
+		dragMoved = false;
+	} else touchPanStart = null;
+}, { passive: true });
+canvas.addEventListener('touchmove', (e) => {
+	if (!touchPanStart || e.touches.length !== 1) return;
+	const dx = e.touches[0].clientX - touchPanStart.x;
+	const dy = e.touches[0].clientY - touchPanStart.y;
+	if (Math.hypot(dx, dy) > 8) {
+		dragMoved = true;
+		e.preventDefault();
+		viewPanX = touchPanStart.px + dx;
+		viewPanY = touchPanStart.py + dy;
+		draw();
+	}
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => {
+	if (!touchPanStart || dragMoved) {
+		touchPanStart = null;
+		return;
+	}
+	e.preventDefault();
+	const t = e.changedTouches[0];
+	if (t) {
+		const r = canvas.getBoundingClientRect();
+		pointer(t.clientX - r.left, t.clientY - r.top, true);
+	}
+	touchPanStart = null;
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+	if (e.key === 'Enter' && (state === 'title' || state === 'over')) startRun();
+	if (state !== 'playing') return;
+	const num = parseInt(e.key, 10);
+	if (num >= 1 && num <= 9 && validNext[num - 1]) moveTo(validNext[num - 1]);
+});
+
+document.getElementById('startBtn').addEventListener('click', startRun);
+document.getElementById('retryBtn').addEventListener('click', startRun);
+
+buildGraph();
+if (lawCountEl) lawCountEl.innerHTML = '<strong>' + ROOMS.length + '</strong> law rooms';
+new ResizeObserver(resize).observe(document.getElementById('mapWrap'));
+window.addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>
